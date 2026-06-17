@@ -46,3 +46,4 @@ vercel deploy --prod     # production
 - 클라이언트가 이미지를 최대 1600px JPEG로 축소해 업로드(용량·토큰 절감, Vercel 함수 본문 한도 대비).
 - 함수가 강제 도구 호출(`record_receipt`)로 `{date, amount, vendor, memo, account}` 구조화 출력을 받는다.
 - 추출 단위는 영수증 1장 = 전표 1건(합계 기준).
+# expense-tracker
