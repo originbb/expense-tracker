@@ -1,49 +1,78 @@
-# 경비 전표 장부 + 영수증 자동 입력
+# 영수증 스캔하면 끝! 초간단 전표 정리 (Expense Tracker)
 
-애플 스타일의 회사 경비 전표 가계부. 영수증 사진을 찍거나 첨부하면 Claude 비전 API가 날짜·금액·사용처·계정과목을 자동 추출해 입력 폼을 채운다.
+영수증 이미지를 업로드하면 OCR 기술(Tesseract.js)을 이용해 금액, 가맹점, 일자 등을 자동 인식하고, 달력 UI 기반으로 직관적인 전표 관리 및 지출 내역을 관리할 수 있는 하이브리드 가계부 웹 애플리케이션입니다.
 
-## 구조
-- `index.html` — 정적 페이지 (캘린더·전표 리스트·입력 모달·엑셀 내보내기). 데이터는 브라우저 localStorage(`expense_ledger_v4`)에 저장.
-- `api/extract-receipt.js` — Vercel 서버리스 함수. 영수증 이미지를 Claude(`claude-haiku-4-5`)로 보내 구조화 추출. **API 키는 이 서버에만 존재**한다.
+## ✨ 주요 기능 (Features)
 
-## 보안 모델
-- `ANTHROPIC_API_KEY` 는 서버 환경변수에만 두고 브라우저에 노출하지 않는다(프록시 구조).
-- 공개 프록시 남용 방지를 위해 `ACCESS_PASSWORD` 로 보호한다. 앱 첫 사용 시 비밀번호를 한 번 입력하면 localStorage(`expense_proxy_pw`)에 저장되고 매 요청 헤더(`x-access-password`)로 전송된다.
-- 첨부 이미지는 추출 목적으로 프록시 → Anthropic 으로 전송된다.
+- **📸 영수증 자동 스캔 (OCR)**
+  - Tesseract.js를 활용하여 영수증 이미지에서 날짜, 금액, 사용처(상호명)를 자동으로 추출 및 입력합니다.
+  - 다중 이미지 일괄 스캔을 지원합니다.
+- **📅 달력 기반 직관적 UI**
+  - 달력 형태로 일별 지출 내역 및 합계를 한눈에 파악할 수 있습니다.
+  - 깔끔한 다크/라이트 모드 테마를 지원합니다.
+- **🔐 로그인 및 데이터 동기화 (Multi-tenancy)**
+  - **게스트 모드**: 로그인 없이도 브라우저(`localStorage`, `IndexedDB`)에 데이터를 저장하고 즉시 사용할 수 있습니다.
+  - **계정 동기화**: 게스트 상태에서 작성한 모든 전표와 영수증 이미지는 회원가입/로그인 시 사용자 계정 클라우드 DB로 원클릭 동기화됩니다.
+  - JWT 기반 인증으로 각 사용자의 데이터는 안전하게 분리 및 보호됩니다.
+- **🗑 영수증 이미지 자동 파기 (60일 정책)**
+  - 기기 용량 관리를 위해 로컬 브라우저 및 서버에 저장된 영수증 이미지는 60일이 경과하면 자동으로 삭제(파기)됩니다.
+- **📥 데이터 내보내기**
+  - 등록된 전표 내역을 엑셀(Excel, xlsx) 파일로 월별 혹은 전체 다운로드할 수 있습니다.
+  - 첨부했던 영수증 이미지 원본들을 ZIP 파일로 일괄 압축하여 다운로드할 수 있습니다.
 
-## 환경변수
-| 이름 | 설명 |
-|------|------|
-| `ANTHROPIC_API_KEY` | Anthropic API 키 (서버 전용) |
-| `ACCESS_PASSWORD` | 앱 접근 비밀번호 (사용자가 앱에서 입력) |
+## 🛠 기술 스택 (Tech Stack)
 
-## 로컬 실행
+- **Frontend**: HTML5, Vanilla JavaScript, CSS3
+  - Tesseract.js (광학 문자 인식)
+  - JSZip (이미지 일괄 다운로드)
+  - SheetJS (엑셀 내보내기)
+- **Backend**: Node.js, Express.js
+- **Database**: SQLite (LibSQL / Turso)
+- **Auth**: JWT (JSON Web Tokens), bcrypt
+- **Deployment**: Render (Web Service Blueprint), GitHub
+
+## 🚀 로컬 실행 방법 (Local Development)
+
+### 1. 패키지 설치
 ```bash
-npm i -g vercel          # 최초 1회
-cd /Users/artwool/dev/expense-tracker
-vercel link              # 프로젝트 연결
-vercel env add ANTHROPIC_API_KEY    # Production/Preview/Development 모두
-vercel env add ACCESS_PASSWORD
-vercel env pull          # .env.local 로 내려받기
-vercel dev               # http://localhost:3000
+npm install
 ```
-`vercel dev` 는 정적 페이지와 `/api/*` 함수를 함께 띄운다. localhost 는 보안 컨텍스트라 카메라 촬영도 동작한다.
 
-## 배포
+### 2. 환경 변수 설정
+프로젝트 루트에 `.env` 파일을 생성하고 아래의 값을 입력합니다. (Turso DB 정보는 [Turso 대시보드](https://turso.tech/)에서 발급)
+
+```env
+# 포트 번호
+PORT=12345
+
+# Turso SQLite 연결 정보
+TURSO_DATABASE_URL=libsql://[your-db-name].turso.io
+TURSO_AUTH_TOKEN=[your-turso-auth-token]
+
+# JWT 시크릿 키 (보안을 위해 복잡한 문자열 사용)
+JWT_SECRET=my_super_secret_jwt_key
+```
+
+### 3. 서버 실행
 ```bash
-vercel deploy            # preview
-vercel deploy --prod     # production
+npm start
 ```
-배포 후 휴대폰으로 접속하면 `capture` 속성으로 카메라 촬영 입력이 가능하다(HTTPS).
+서버가 실행되면 브라우저에서 `http://localhost:12345` 로 접속하여 앱을 이용할 수 있습니다.
 
-## 사용 흐름
-1. 캘린더에서 + 또는 날짜 클릭 → 입력 모달
-2. **📷 영수증으로 채우기** → 사진 촬영/첨부
-3. 자동 채워진 날짜·금액·사용처·계정과목 검토 후 **전표 추가**
-4. 비밀번호 변경/삭제는 모달 우측 상단 ⚙
+## ☁️ 배포 가이드 (Deployment via Render)
 
-## 영수증 인식 동작
-- 클라이언트가 이미지를 최대 1600px JPEG로 축소해 업로드(용량·토큰 절감, Vercel 함수 본문 한도 대비).
-- 함수가 강제 도구 호출(`record_receipt`)로 `{date, amount, vendor, memo, account}` 구조화 출력을 받는다.
-- 추출 단위는 영수증 1장 = 전표 1건(합계 기준).
-# expense-tracker
+이 프로젝트는 `render.yaml` (Blueprints)를 포함하고 있어 **Render.com**에서 쉽게 자동 배포할 수 있습니다.
+
+1. **Render.com** 대시보드 로그인
+2. **Blueprints** 탭 이동 후 **New Blueprint Instance** 클릭
+3. 현재 GitHub 레포지토리 연결
+4. 배포 과정 중 요구하는 환경변수(`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `JWT_SECRET`) 입력
+5. **Apply** 클릭 시 자동으로 서비스가 빌드되고 배포됩니다.
+
+## 📝 데이터베이스 스키마
+- **users**: `id`, `email`, `password_hash`, `created_at`
+- **expenses**: `id`, `user_id`, `date`, `account`, `debit`, `credit`, `memo`, `vendor`, `created_at`
+- (영수증 이미지는 DB 과부하를 막기 위해 클라이언트 단의 IndexedDB를 활용하거나 필요시 Blob Storage 확장이 가능하도록 분리 설계되어 있습니다.)
+
+---
+**Note:** 이 프로젝트는 사용자의 기기 자원을 효율적으로 사용하기 위해 클라이언트 로컬 저장소와 서버 저장소를 동시에 활용하는 하이브리드 아키텍처를 채택하였습니다.
