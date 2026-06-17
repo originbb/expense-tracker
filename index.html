@@ -17,7 +17,7 @@
 <style>
   :root{
     /* ---- color (light) ---- */
-    --bg:#f5f5f7; --surface:#ffffff; --surface-2:#f0f0f3;
+    --bg:#f5f5f7; --surface:#ffffff; --surface-2:#f0f0f3; --control-bg:#ffffff;
     --ink:#1d1d1f; --ink-2:#6e6e73; --ink-3:#a1a1a6;
     --line:rgba(0,0,0,.08); --line-2:rgba(0,0,0,.14);
     --blue:#0071e3; --blue-hover:#0077ed; --blue-soft:rgba(0,113,227,.12);
@@ -41,7 +41,7 @@
   /* dark tokens — follow system unless user forced light */
   @media (prefers-color-scheme: dark){
     :root:not(.theme-light){
-      --bg:#000000; --surface:#1c1c1e; --surface-2:#2c2c2e;
+      --bg:#000000; --surface:#1c1c1e; --surface-2:#2c2c2e; --control-bg:#000000;
       --ink:#f5f5f7; --ink-2:#aeaeb2; --ink-3:#8e8e93;
       --line:rgba(255,255,255,.10); --line-2:rgba(255,255,255,.16);
       --blue:#0a84ff; --blue-hover:#3897ff; --blue-soft:rgba(10,132,255,.22);
@@ -54,7 +54,7 @@
   }
   /* explicit user override (beats system) */
   :root.theme-dark{
-    --bg:#000000; --surface:#1c1c1e; --surface-2:#2c2c2e;
+    --bg:#000000; --surface:#1c1c1e; --surface-2:#2c2c2e; --control-bg:#000000;
     --ink:#f5f5f7; --ink-2:#aeaeb2; --ink-3:#8e8e93;
     --line:rgba(255,255,255,.10); --line-2:rgba(255,255,255,.16);
     --blue:#0a84ff; --blue-hover:#3897ff; --blue-soft:rgba(10,132,255,.22);
@@ -85,6 +85,8 @@
   .wrap > *:nth-child(4){animation-delay:.21s;}
   .wrap > *:nth-child(5){animation-delay:.27s;}
   .wrap > *:nth-child(n+6){animation-delay:.33s;}
+  /* 드롭다운(팝오버)을 품은 toolbar는 애니 제외 — opacity/transform이 stacking context를 만들어 메뉴가 카드 뒤로 깔리는 문제 방지 */
+  .wrap > .toolbar{animation:none;}
   @media (prefers-reduced-motion: reduce){ .wrap > *{animation:none;} body{transition:none;} }
 
   header.top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:24px;}
@@ -100,10 +102,10 @@
   .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
   .cal-title{font-size:19px;font-weight:700;letter-spacing:-.01em;}
   .cal-nav{display:flex;gap:8px;align-items:center;}
-  .nav-btn{width:34px;height:34px;border:none;background:var(--surface-2);border:1px solid var(--line);border-radius:50%;color:var(--ink);cursor:pointer;transition:.15s;display:inline-flex;align-items:center;justify-content:center;padding:0;}
+  .nav-btn{width:34px;height:34px;border:none;background:var(--control-bg);border:1px solid var(--line);border-radius:50%;color:var(--ink);cursor:pointer;transition:.15s;display:inline-flex;align-items:center;justify-content:center;padding:0;}
   .nav-btn:hover{background:var(--blue);color:#fff;border-color:var(--blue);}
   .nav-btn svg { display: block; }
-  .today-btn{height:34px;padding:0 14px;border:1px solid var(--line-2);background:var(--surface-2);border-radius:17px;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;transition:.15s;font-family:var(--font);display:inline-flex;align-items:center;justify-content:center;}
+  .today-btn{height:34px;padding:0 14px;border:1px solid var(--line-2);background:var(--control-bg);border-radius:17px;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;transition:.15s;font-family:var(--font);display:inline-flex;align-items:center;justify-content:center;}
   .today-btn:hover{background:var(--ink);color:#fff;border-color:var(--ink);}
   .nav-btn.add{background:var(--blue);color:#fff;border-color:var(--blue);margin-left:4px;}
   .nav-btn.add:hover{background:#0062c4;border-color:#0062c4;}
@@ -111,7 +113,7 @@
   .grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;}
   .dow{text-align:center;font-size:11px;font-weight:600;color:var(--ink-3);padding:4px 0 8px;letter-spacing:.02em;}
   .dow.sun{color:var(--credit);}.dow.sat{color:var(--debit);}
-  .day{aspect-ratio:1/0.72;border-radius:var(--radius-sm);border:1px solid transparent;background:var(--surface-2);padding:6px 4px;cursor:pointer;position:relative;transition:.13s;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px;}
+  .day{aspect-ratio:1/0.72;border-radius:var(--radius-sm);border:1px solid transparent;background:transparent;padding:6px 4px;cursor:pointer;position:relative;transition:.13s;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:2px;}
   .day:hover{background:var(--blue-soft);}
   .day.empty{background:transparent;cursor:default;}
   .day.empty:hover{background:transparent;}
@@ -141,7 +143,8 @@
   .btn-ghost:hover{background:var(--surface-2);opacity:.85;}
 
   /* export dropdown menu */
-  .export-menu{position:relative;}
+  .export-menu{position:relative;z-index:40;}
+  #exportMenuBtn{background:var(--control-bg);border:1px solid var(--line-2);}
   .export-dropdown{position:absolute;right:0;top:calc(100% + 6px);background:var(--glass-bg);-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);border:1px solid var(--glass-border);border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:6px;min-width:210px;display:none;z-index:30;}
   .export-dropdown.open{display:block;animation:fade .14s ease;}
   .export-item{display:block;width:100%;text-align:left;background:none;border:none;font-family:var(--font);font-size:14px;font-weight:500;color:var(--ink);padding:11px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;}
@@ -184,7 +187,7 @@
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.32);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow-y:auto;}
   .overlay.open{display:flex;animation:fade .18s ease;}
   @keyframes fade{from{opacity:0}to{opacity:1}}
-  .modal{width:100%;max-width:640px;margin:auto;background:var(--glass-bg);-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);border:1px solid var(--glass-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);overflow:hidden;animation:pop .3s var(--ease);}
+  .modal{width:100%;max-width:640px;margin:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);overflow:hidden;animation:pop .3s var(--ease);}
   @keyframes pop{from{transform:translateY(14px) scale(.98);opacity:0}to{transform:none;opacity:1}}
   .modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line);}
   .modal-head h3{font-size:16px;font-weight:700;}
@@ -438,6 +441,7 @@
   <div style="margin-top:16px; text-align:left; font-size:12.5px; color:var(--ink-2); line-height:1.5; padding: 0 4px; margin-bottom: 24px;">
     ⚠️ <strong style="color:var(--ink);">안내</strong>: 영수증 원본 이미지는 <strong style="color:var(--ink);">해당 월 종료 60일 이후 자동 삭제</strong>됩니다. 증빙 자료 보관이 필요하신 경우 반드시 사전에 엑셀 및 영수증 다운로드 기능을 통해 백업해 주세요.
   </div>
+</div><!-- /.wrap : 모달 오버레이는 body 직속으로 분리해 fixed 위치/stacking 보장 -->
 
   <!-- DAY DETAIL -->
   <div class="overlay" id="dayOverlay">
