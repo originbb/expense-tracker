@@ -6,7 +6,6 @@ import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import nodemailer from 'nodemailer';
 import { createClient } from '@libsql/client';
 
 dotenv.config();
@@ -105,26 +104,15 @@ async function cleanupServerImages() {
 
 
 // --- 이메일 발송 설정 ---
-// SMTP 환경변수가 있으면 실제 발송, 없으면 콘솔에 출력(개발/테스트용 폴백)
-const smtpConfigured = !!process.env.SMTP_HOST;
-const mailer = smtpConfigured
-  ? nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: process.env.SMTP_SECURE === 'true', // 465 포트면 true
-      connectionTimeout: 5000,
-      greetingTimeout: 5000,
-      socketTimeout: 10000,
-      auth: process.env.SMTP_USER
-        ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-        : undefined
-    })
-  : null;
-const MAIL_FROM = process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@expense-tracker.local';
+// Brevo HTTP API(443 포트) 연동. API 키가 없으면 콘솔에 출력(개발/테스트용 폴백)
+// HTTP 기반이라 회사망/Render 무료 플랜의 SMTP 포트 차단을 우회하며, 도메인 없이도
+// Brevo에서 인증한 발신자 주소로 누구에게나 발송할 수 있습니다.
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const MAIL_FROM = process.env.MAIL_FROM; // Brevo에서 인증한 발신자 이메일
+const MAIL_FROM_NAME = process.env.MAIL_FROM_NAME || '경비 전표';
 
 async function sendResetCodeMail(email, code) {
   const subject = '[경비 전표] 비밀번호 재설정 인증 코드';
-  const text = `비밀번호 재설정 인증 코드는 [${code}] 입니다.\n10분 이내에 입력해 주세요.\n\n본인이 요청하지 않았다면 이 메일을 무시하세요.`;
   const html = `
     <div style="font-family:-apple-system,'Apple SD Gothic Neo',sans-serif;max-width:480px;margin:0 auto;padding:24px;">
       <h2 style="font-size:18px;color:#1d1d1f;">비밀번호 재설정 인증 코드</h2>
@@ -133,11 +121,30 @@ async function sendResetCodeMail(email, code) {
       <p style="font-size:12px;color:#a1a1a6;">본인이 요청하지 않았다면 이 메일을 무시하세요.</p>
     </div>`;
 
-  if (!mailer) {
+  if (!BREVO_API_KEY || !MAIL_FROM) {
     console.log(`📧 [메일 폴백] ${email} 비밀번호 재설정 인증 코드: ${code} (유효 10분)`);
     return;
   }
-  await mailer.sendMail({ from: MAIL_FROM, to: email, subject, text, html });
+
+  const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': BREVO_API_KEY,
+      'Content-Type': 'application/json',
+      'accept': 'application/json'
+    },
+    body: JSON.stringify({
+      sender: { name: MAIL_FROM_NAME, email: MAIL_FROM },
+      to: [{ email }],
+      subject,
+      htmlContent: html
+    })
+  });
+
+  if (!resp.ok) {
+    const detail = await resp.text();
+    throw new Error(`Brevo 발송 실패 (${resp.status}): ${detail}`);
+  }
 }
 
 // 인증 미들웨어

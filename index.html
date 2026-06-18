@@ -209,6 +209,10 @@
   .field input,.field select{height:40px;border:1px solid var(--line-2);border-radius:10px;padding:0 11px;font-size:16px;font-family:var(--font);background:var(--surface);color:var(--ink);outline:none;transition:.13s;width:100%;}
   .field input:focus,.field select:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-soft);}
   .field select{appearance:none;-webkit-appearance:none;-moz-appearance:none;padding-right:38px;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236e6e73' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;}
+  /* iOS Safari는 type=date 입력을 콘텐츠 기준으로 키워 컨테이너를 넘침. appearance 제거 + min-width:0 으로 width:100% 강제 */
+  .field input[type="date"]{-webkit-appearance:none;appearance:none;min-width:0;}
+  .field input[type="date"]::-webkit-date-and-time-value{text-align:left;}
+  .field input[type="date"]::-webkit-calendar-picker-indicator{margin-left:auto;}
   .field.c2{grid-column:span 2;}.field.c3{grid-column:span 3;}.field.c4{grid-column:span 4;}.field.c5{grid-column:span 5;}.field.c6{grid-column:span 6;}.field.c8{grid-column:span 8;}.field.c12{grid-column:span 12;}
   .add-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px;}
   .hint{font-size:11px;color:var(--green);font-weight:600;height:14px;}
