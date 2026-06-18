@@ -1243,20 +1243,41 @@ function parseReceipt(text){
     }
   }
 
-  // ---- 계정과목 추정 ----
+  // ---- 계정과목 추정 및 적요(메모) 힌트 자동 생성 ----
   const fullText = text.replace(/\s+/g, '').toLowerCase();
-  if(/모텔|호텔|motel|hotel|숙박|여관|리조트|콘도|펜션/.test(fullText)) {
+  let categoryKeyword = '';
+  if(/모텔|호텔|motel|hotel|숙박|여관|리조트|콘도|펜션|여행/.test(fullText)) {
     result.account = '(판)여비교통비-(국내출장비)';
+    categoryKeyword = '숙박비';
   } else if(/택시|taxi|카카오티|티머니|tmoney|운수|교통|버스|지하철|철도|ktx|srt|코레일|주유|충전/.test(fullText)) {
     result.account = '(판)여비교통비-(시내교통비)';
-  } else if(/식당|음식|구내식당|커피|카페|coffee|cafe|베이커리|레스토랑|한식|중식|일식|분식|치킨|피자/.test(fullText)) {
+    categoryKeyword = '교통비';
+  } else if(/식당|음식|구내식당|커피|카페|coffee|cafe|베이커리|레스토랑|한식|중식|일식|분식|치킨|피자|식비|외식/.test(fullText)) {
     result.account = '(판)복리후생비';
+    categoryKeyword = '식대';
   }
 
-  // ---- 택시 결제는 사용처를 '택시'로 통일 (가맹점명/상품명 기반) ----
+  // 사용처(Vendor) 정제: 앞에 붙은 특수기호(예: €) 티마모델 -> 티마모델) 제거
+  if (result.vendor) {
+    result.vendor = result.vendor.replace(/^[^a-zA-Z가-힣0-9(]+/, '').trim();
+    // 흔한 OCR 오인식 보정 (모델 -> 모텔)
+    if (categoryKeyword === '숙박비' && result.vendor.includes('모델')) {
+      result.vendor = result.vendor.replace('모델', '모텔');
+    }
+    
+    // 적요 자동 완성 (예: 영월 출장 택시비 -> 테마모텔 숙박비)
+    if (categoryKeyword) {
+      result.memo = `${result.vendor} ${categoryKeyword}`;
+    } else {
+      result.memo = `${result.vendor} 결제`;
+    }
+  }
+
+  // ---- 택시 결제는 사용처를 '택시'로 통일 ----
   const taxiKw=/택시|카카오택시|카카오\s*t|카카오모빌리티|이동의\s*즐거움|티머니|tmoney|진모빌리티|우티|uti|타다|tada/i;
   if(taxiKw.test(text) || taxiKw.test(result.vendor)) {
     result.vendor = '택시';
+    result.memo = '택시비';
   }
 
   return result;
@@ -1521,7 +1542,7 @@ async function fillFromReceipt(files){
         }
         document.getElementById('fDate').value=r.date;
         document.getElementById('fDebit').value=Number(r.amount).toLocaleString('ko-KR');
-        document.getElementById('fMemo').value='';
+        document.getElementById('fMemo').value=r.memo || '';
         document.getElementById('fVendor').value=r.vendor;
         if(r.account) {
           document.getElementById('fAccount').value=r.account;
@@ -1531,7 +1552,7 @@ async function fillFromReceipt(files){
         
         const addHint=document.getElementById('addHint');
         addHint.style.color='var(--green)';
-        addHint.textContent='자동 인식 완료 · 적요를 입력하세요';
+        addHint.textContent='자동 인식 완료 · 내역을 확인해 주세요';
         setTimeout(()=>addHint.textContent='',3500);
       } else {
         const item = {
@@ -1539,7 +1560,7 @@ async function fillFromReceipt(files){
           account: r.account || '미지급금-(직원경비)',
           debit: r.amount || 0,
           credit: 0,
-          memo: '',
+          memo: r.memo || '',
           vendor: r.vendor || ''
         };
         
