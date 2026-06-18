@@ -5,7 +5,7 @@
   "type": "module",
   "description": "경비 전표 장부 + 영수증 자동 입력 (Claude 비전 API 프록시)",
   "scripts": {
-    "start": "node server.js"
+    "start": "node --dns-result-order=ipv4first server.js"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
