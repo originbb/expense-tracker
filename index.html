@@ -5,10 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>영수증 스캔하면 끝! 초간단 전표 정리</title>
 <script>
-  // 깜빡임 방지: 저장된 수동 테마를 렌더 전에 적용 (없으면 시스템 설정 자동)
+  // 깜빡임 방지: 저장된 수동 테마를 렌더 전에 적용 (기본값은 라이트모드)
   (function(){var t=localStorage.getItem('expense_theme');
-    if(t==='dark')document.documentElement.classList.add('theme-dark');
-    else if(t==='light')document.documentElement.classList.add('theme-light');})();
+    if(t==='dark')document.documentElement.classList.add('theme-dark');})();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -38,21 +37,7 @@
     --glow-1:rgba(0,113,227,.10); --glow-2:rgba(120,90,255,.07);
     --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Pretendard","Apple SD Gothic Neo",sans-serif;
   }
-  /* dark tokens — follow system unless user forced light */
-  @media (prefers-color-scheme: dark){
-    :root:not(.theme-light){
-      --bg:#000000; --surface:#1c1c1e; --surface-2:#2c2c2e; --control-bg:#000000;
-      --ink:#f5f5f7; --ink-2:#aeaeb2; --ink-3:#8e8e93;
-      --line:rgba(255,255,255,.10); --line-2:rgba(255,255,255,.16);
-      --blue:#0a84ff; --blue-hover:#3897ff; --blue-soft:rgba(10,132,255,.22);
-      --debit:#0a84ff; --credit:#ff453a; --green:#30d158;
-      --glass-bg:rgba(28,28,30,.72); --glass-border:rgba(255,255,255,.12);
-      --hairline:rgba(255,255,255,.10);
-      --shadow:none; --shadow-lg:none;
-      --glow-1:rgba(10,132,255,.16); --glow-2:rgba(120,90,255,.12);
-    }
-  }
-  /* explicit user override (beats system) */
+  /* 기본값은 라이트모드. 다크는 사용자가 직접 선택했을 때(.theme-dark)에만 적용 */
   :root.theme-dark{
     --bg:#000000; --surface:#1c1c1e; --surface-2:#2c2c2e; --control-bg:#000000;
     --ink:#f5f5f7; --ink-2:#aeaeb2; --ink-3:#8e8e93;
@@ -102,10 +87,11 @@
   .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
   .cal-title{font-size:19px;font-weight:700;letter-spacing:-.01em;}
   .cal-nav{display:flex;gap:8px;align-items:center;}
-  .nav-btn{width:34px;height:34px;border:none;background:var(--control-bg);border:1px solid var(--line);border-radius:50%;color:var(--ink);cursor:pointer;transition:.15s;display:inline-flex;align-items:center;justify-content:center;padding:0;}
+  .nav-btn{width:38px;height:38px;border:none;background:var(--control-bg);border:1px solid var(--line);border-radius:50%;color:var(--ink);cursor:pointer;transition:.15s;display:inline-flex;align-items:center;justify-content:center;padding:0;-webkit-tap-highlight-color:transparent;}
   .nav-btn:hover{background:var(--blue);color:#fff;border-color:var(--blue);}
+  .nav-btn:active{transform:scale(.92);}
   .nav-btn svg { display: block; }
-  .today-btn{height:34px;padding:0 14px;border:1px solid var(--line-2);background:var(--control-bg);border-radius:17px;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;transition:.15s;font-family:var(--font);display:inline-flex;align-items:center;justify-content:center;}
+  .today-btn{height:38px;padding:0 16px;border:1px solid var(--line-2);background:var(--control-bg);border-radius:19px;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;transition:.15s;font-family:var(--font);display:inline-flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;}
   .today-btn:hover{background:var(--ink);color:#fff;border-color:var(--ink);}
   .nav-btn.add{background:var(--blue);color:#fff;border-color:var(--blue);margin-left:4px;}
   .nav-btn.add:hover{background:#0062c4;border-color:#0062c4;}
@@ -168,10 +154,12 @@
   td.credit{color:var(--credit);font-weight:600;font-variant-numeric:tabular-nums;}
   td.muted{color:var(--ink-3);}
   .tag{display:inline-block;font-size:11px;font-weight:600;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:2px 7px;}
-  .row-act{display:flex;gap:6px;}
-  .icon-btn{width:28px;height:28px;border:1px solid var(--line);background:var(--surface);border-radius:8px;cursor:pointer;font-size:13px;color:var(--ink-2);transition:.13s;display:flex;align-items:center;justify-content:center;}
+  .row-act{display:flex;gap:8px;}
+  .icon-btn{width:36px;height:36px;border:1px solid var(--line);background:var(--surface);border-radius:10px;cursor:pointer;font-size:16px;line-height:normal;color:var(--ink-2);transition:.13s;display:inline-flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;flex:0 0 auto;}
   .icon-btn:hover{background:var(--ink);color:#fff;border-color:var(--ink);}
-  .icon-btn.del:hover{background:var(--credit);border-color:var(--credit);}
+  .icon-btn.del{color:var(--credit);}
+  .icon-btn.del:hover{background:var(--credit);color:#fff;border-color:var(--credit);}
+  .icon-btn:active{transform:scale(.92);}
 
   tfoot td{background:var(--surface-2);font-weight:700;border-top:2px solid var(--line-2);border-bottom:none;font-variant-numeric:tabular-nums;}
   tfoot .lbl{color:var(--ink-2);font-weight:600;}
@@ -191,7 +179,7 @@
   @keyframes pop{from{transform:translateY(14px) scale(.98);opacity:0}to{transform:none;opacity:1}}
   .modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line);}
   .modal-head h3{font-size:16px;font-weight:700;}
-  .modal-close{width:30px;height:30px;border:none;background:var(--surface-2);border:1px solid var(--line);border-radius:50%;font-size:15px;color:var(--ink-2);cursor:pointer;transition:.13s;}
+  .modal-close{width:38px;height:38px;border:none;background:var(--surface-2);border:1px solid var(--line);border-radius:50%;font-size:17px;color:var(--ink-2);cursor:pointer;transition:.13s;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;}
   .modal-close:hover{background:var(--ink);color:#fff;border-color:var(--ink);}
   .modal-body{padding:22px;}
 
@@ -202,7 +190,7 @@
   .dayrow .acc{font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .dayrow .memo{font-size:12px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
   .dayrow .amt2{font-size:14px;font-weight:700;color:var(--debit);font-variant-numeric:tabular-nums;white-space:nowrap;}
-  .dayrow .acts{display:flex;gap:6px;}
+  .dayrow .acts{display:flex;gap:8px;}
   .day-empty{padding:30px 10px;text-align:center;color:var(--ink-3);font-size:13px;line-height:1.6;}
   .day-total{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:12px;border-top:2px solid var(--line-2);font-weight:700;font-size:13px;}
   .day-total .v{color:var(--credit);font-variant-numeric:tabular-nums;font-size:15px;}
@@ -343,20 +331,30 @@
     #saveState{display:none;}                /* '저장됨' 텍스트 숨김 */
     .auth-badge{font-size:11.5px;padding:7px 12px;}
 
-    /* 4. 달력 밀도 ↑ */
+    /* 4. 달력 — 날짜 칸을 손가락으로 누르기 쉽게 충분한 높이 확보(최소 46px) */
     .cal{padding:16px 12px;margin-bottom:16px;}
     .cal-head{margin-bottom:12px;}
     .cal-title{font-size:17px;}
     .grid{gap:4px;}
-    .day{padding:3px 2px;aspect-ratio:1/0.72;}
-    .day .num{font-size:13px;}
+    .day{padding:4px 2px;aspect-ratio:auto;min-height:46px;justify-content:center;}
+    .day .num{font-size:14px;}
     .day .amt{display:none;}
-    .day .dot{top:5px;}
+    .day .dot{top:6px;}
     .dow{font-size:11px;padding:2px 0 6px;}
 
     /* 폼 1열 정렬 */
     .field.c2,.field.c3,.field.c4,.field.c5,.field.c6,.field.c8{grid-column:span 12;}
     .field.c12{grid-column:span 12;}
+
+    /* 5. 터치 타깃 확대 — 애플 권장 44px (수정/삭제·네비·입력·버튼) */
+    .row-act,.dayrow .acts{gap:10px;}
+    .icon-btn{width:44px;height:44px;font-size:19px;border-radius:12px;}
+    .nav-btn{width:44px;height:44px;}
+    .today-btn{height:44px;border-radius:22px;}
+    .modal-close{width:44px;height:44px;font-size:19px;}
+    .btn{height:44px;}
+    .field input,.field select{height:46px;}
+    .auth-badge{padding:13px 15px;}
   }
 </style>
 </head>
@@ -424,7 +422,7 @@
             <th class="r" style="width:88px">대변금액</th>
             <th>적요</th>
             <th style="width:140px">사용처</th>
-            <th style="width:90px"></th>
+            <th style="width:140px"></th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -545,6 +543,41 @@
           </div>
           <div id="authMessage" class="auth-message" style="display: none;"></div>
           <button type="submit" class="btn btn-primary" id="authSubmitBtn" style="width: 100%; height: 44px; margin-top: 20px; font-size: 14px;">로그인</button>
+          <div id="forgotPwRow" style="text-align: center; margin-top: 14px;">
+            <button type="button" id="forgotPwLink" style="background:none; border:none; color:var(--ink-2); font-size:13px; text-decoration:underline; cursor:pointer;">비밀번호를 잊으셨나요?</button>
+          </div>
+        </form>
+
+        <!-- 비밀번호 재설정 (이메일 인증 코드) -->
+        <form id="resetForm" style="display: none;">
+          <p style="font-size:13px; color:var(--ink-2); line-height:1.5; margin-bottom:16px;">가입한 이메일로 6자리 인증 코드를 보내드립니다. 코드를 입력해 새 비밀번호를 설정하세요.</p>
+          <div class="form-grid">
+            <div class="field c12">
+              <label>이메일 주소 <span class="req">*</span></label>
+              <input type="email" id="resetEmail" placeholder="example@email.com" autocomplete="email">
+              <span class="err" id="resetEmailErr">이메일 주소를 올바르게 입력하세요</span>
+            </div>
+            <div class="field c12" id="resetCodeStep" style="display: none; margin-top: 10px;">
+              <label>인증 코드 <span class="req">*</span></label>
+              <input type="text" id="resetCode" placeholder="메일로 받은 6자리 코드" inputmode="numeric" maxlength="6" autocomplete="one-time-code">
+              <span class="err" id="resetCodeErr">인증 코드를 입력하세요</span>
+            </div>
+            <div class="field c12" id="resetPwStep" style="display: none; margin-top: 10px;">
+              <label>새 비밀번호 <span class="req">*</span></label>
+              <input type="password" id="resetPassword" placeholder="영문, 숫자, 특수문자 포함 8자 이상" autocomplete="new-password">
+              <span class="err" id="resetPasswordErr">영문, 숫자, 특수문자 포함 8자 이상 입력해주세요</span>
+            </div>
+            <div class="field c12" id="resetPwConfirmStep" style="display: none; margin-top: 10px;">
+              <label>새 비밀번호 확인 <span class="req">*</span></label>
+              <input type="password" id="resetPasswordConfirm" placeholder="비밀번호 다시 입력" autocomplete="new-password">
+              <span class="err" id="resetPasswordConfirmErr">비밀번호가 일치하지 않습니다</span>
+            </div>
+          </div>
+          <div id="resetMessage" class="auth-message" style="display: none;"></div>
+          <button type="submit" class="btn btn-primary" id="resetSubmitBtn" style="width: 100%; height: 44px; margin-top: 20px; font-size: 14px;">인증 코드 받기</button>
+          <div style="text-align: center; margin-top: 14px;">
+            <button type="button" id="backToLoginLink" style="background:none; border:none; color:var(--ink-2); font-size:13px; text-decoration:underline; cursor:pointer;">로그인으로 돌아가기</button>
+          </div>
         </form>
       </div>
     </div>
@@ -609,25 +642,18 @@ const moonSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" str
 const sunSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
 
 const rootEl = document.documentElement;
-const systemDark = window.matchMedia('(prefers-color-scheme: dark)');
+// 기본값은 라이트모드. 사용자가 직접 다크모드를 선택했을 때만 .theme-dark 적용
 function effectiveDark(){
-  if (rootEl.classList.contains('theme-dark')) return true;
-  if (rootEl.classList.contains('theme-light')) return false;
-  return systemDark.matches; // 수동 설정 없으면 시스템 따름
+  return rootEl.classList.contains('theme-dark');
 }
 function updateThemeIcon(){ themeBtn.innerHTML = effectiveDark() ? sunSvg : moonSvg; }
 updateThemeIcon();
 themeBtn.onclick = () => {
   const goDark = !effectiveDark();
-  rootEl.classList.remove('theme-light','theme-dark');
-  rootEl.classList.add(goDark ? 'theme-dark' : 'theme-light');
+  rootEl.classList.toggle('theme-dark', goDark);
   localStorage.setItem('expense_theme', goDark ? 'dark' : 'light');
   updateThemeIcon();
 };
-// 자동(수동 미설정) 상태에서 시스템 테마가 바뀌면 아이콘 갱신
-systemDark.addEventListener('change', () => {
-  if (!rootEl.classList.contains('theme-dark') && !rootEl.classList.contains('theme-light')) updateThemeIcon();
-});
 
 function setLoading(btn, isLoading, text) {
   if (isLoading) {
@@ -1132,54 +1158,102 @@ function parseReceipt(text){
   const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
   const result={date:'',amount:0,vendor:'',memo:''};
 
-  const dateRe=/(?:20)?\d{2}[.\/-]\s*(?:0?[1-9]|1[0-2])\s*[.\/-]\s*(?:0?[1-9]|[12]\d|3[01])/;
-  for(const l of lines){
-    const m=l.match(dateRe);
-    if(m){
-      let d=m[0].replace(/\s/g,'');
-      const parts=d.split(/[.\/-]/).map(Number);
-      if(parts[0]<100)parts[0]+=2000;
-      result.date=`${parts[0]}-${pad(parts[1])}-${pad(parts[2])}`;
-      break;
-    }
-  }
+  // ---- 날짜: 거래/승인 일시 키워드가 있는 줄을 우선 (두 자리 우선 매칭으로 일(日) 오인식 방지) ----
+  const dateRe=/(20\d{2}|\d{2})\s*[.\/\-년]\s*(1[0-2]|0?[1-9])\s*[.\/\-월]\s*(3[01]|[12]\d|0?[1-9])\s*일?/;
+  const dateKw=/(거\s*래\s*일|승\s*인\s*일|결\s*제\s*일|판\s*매\s*일|이\s*용\s*일|일\s*시|날\s*짜)/;
+  const normDate=m=>{let y=Number(m[1]);if(y<100)y+=2000;return `${y}-${pad(Number(m[2]))}-${pad(Number(m[3]))}`;};
+  for(const l of lines){ if(dateKw.test(l)){ const m=l.match(dateRe); if(m){ result.date=normDate(m); break; } } }
+  if(!result.date){ for(const l of lines){ const m=l.match(dateRe); if(m){ result.date=normDate(m); break; } } }
   if(!result.date)result.date=ymd(new Date());
 
-  const amountKw=/(합\s*계|총\s*액|결\s*제\s*금\s*액|총\s*합\s*계|단\s*가|계\s*산)/i;
-  const numRe=/[\d,]{3,}/g;
-  let maxAmt=0;
-  let kwAmt=0;
-  for(const l of lines){
-    const nums=(l.match(numRe)||[]).map(s=>Number(s.replace(/,/g,'')));
-    nums.forEach(n=>{if(n>maxAmt)maxAmt=n;});
-    if(amountKw.test(l)){
-      nums.forEach(n=>{if(n>kwAmt)kwAmt=n;});
-    }
-  }
-  result.amount=kwAmt||maxAmt;
+  // ---- 금액: '천단위 구분(콤마/점)이 있는 숫자(16,900·16.900)'를 핵심 신호로. OCR이 '원'을 '뭔/8'로 깨먹어도 인식 ----
+  const strongKw=/(합\s*계|총\s*액|총\s*[가-힣]*\s*금\s*액|결\s*제\s*금\s*액|승\s*인\s*금\s*액|판\s*매\s*금\s*액|거\s*래\s*금\s*액|청\s*구\s*금\s*액|금\s*액)/;
+  const excludeKw=/(받\s*은|거\s*스\s*름|현\s*금\s*받|면\s*세|부\s*가\s*세|공\s*급\s*가|포\s*인\s*트|할\s*인)/; // 합계가 아닌 보조 금액
+  const MAX=100000000; // 1억 초과 숫자는 금액 후보에서 제외(번호 오인식)
+  const toNum=s=>Number(String(s).replace(/[.,\s]/g,'')); // 콤마·점·공백 제거('16.900'→16900)
 
-  const vendorKw=/(상\s*호\s*명|상\s*호|가\s*맹\s*점\s*명|가\s*맹\s*점|매\s*장\s*명|매\s*장|점\s*포\s*명|점\s*포|가\s*게\s*명)/;
-  for(const l of lines){
-    if(vendorKw.test(l)){
-      const v=l.replace(vendorKw,'').replace(/[:;\|\s]+/g,' ').trim();
-      if(v.length>=2)result.vendor=v;
-      break;
+  // 숫자 직전 라벨(12자)로 받은/거스름/할인/포인트 옆 숫자를 제외하고, 합계 키워드면 가중치 부여
+  const cand=[];
+  const collectAmt=(reSrc,grp)=>{
+    for(const l of lines){
+      const re=new RegExp(reSrc,'g'); let m;
+      while((m=re.exec(l))!==null){
+        const n=toNum(grp?m[grp]:m[0]);
+        if(!n||n>MAX)continue;
+        const before=l.slice(Math.max(0,m.index-12),m.index);
+        if(excludeKw.test(before))continue;
+        cand.push({n, strong:strongKw.test(before)});
+      }
     }
+  };
+  // 1차: 천단위 구분 숫자(16,900 / 16.900) — 결제번호·날짜·카드번호엔 3자리 그룹이 없어 자연히 제외됨
+  collectAmt('\\d{1,3}(?:[.,]\\d{3})+', 0);
+  // 2차: 그룹 숫자가 없을 때만 '원/뭔/윈/웜'이 붙은 숫자(공백 오인식 '16 900원'도 허용)
+  if(!cand.length) collectAmt('(\\d[\\d.,\\s]*\\d|\\d)\\s*[원웜윈뭔]', 1);
+
+  if(cand.length){
+    const freq=new Map();
+    cand.forEach(c=>freq.set(c.n,(freq.get(c.n)||0)+1));
+    const strongVals=[...new Set(cand.filter(c=>c.strong).map(c=>c.n))];
+    const pool=strongVals.length?strongVals:[...freq.keys()];
+    pool.sort((a,b)=>(freq.get(b)-freq.get(a))||(b-a)); // 최빈값 우선, 동률이면 큰 값
+    result.amount=pool[0];
+  }else{
+    // 폴백: 구분기호·'원' 모두 없을 때. 번호/카드/사업자/날짜 줄 제외, 6자리 이상은 ID로 제외
+    const idKw=/(번\s*호|카\s*드|사\s*업\s*자|연\s*락\s*처|전\s*화|단\s*말|할\s*부|등\s*록|거\s*래\s*일|일\s*시|날\s*짜)/;
+    let kwN=0,mxN=0;
+    for(const l of lines){
+      if(excludeKw.test(l))continue;
+      if(idKw.test(l)&&!strongKw.test(l))continue;
+      const isStrong=strongKw.test(l);
+      (l.match(/\d+/g)||[]).forEach(s=>{if(s.length>=6)return;const n=Number(s);if(n&&n<=MAX){if(n>mxN)mxN=n;if(isStrong&&n>kwN)kwN=n;}});
+    }
+    result.amount=kwN||mxN;
+  }
+
+  // ---- 상호명(거래처): 라벨 뒤 값을 추출하되 복합 라벨('가맹점 주문번호' 등)은 건너뜀 ----
+  const vendorKw=/(상\s*호\s*명|상\s*호|가\s*맹\s*점\s*명|가\s*맹\s*점|상\s*점\s*명|매\s*장\s*명|매\s*장|점\s*포\s*명|점\s*포|가\s*게\s*명|판\s*매\s*자)/;
+  const labelStop=/(대\s*표|사\s*업\s*자|연\s*락\s*처|주\s*소|등\s*록\s*번\s*호|전\s*화|승\s*인|카\s*드|금\s*액|번\s*호|일\s*시|상\s*품\s*명)/;
+  const leadStop=/^(주\s*문|번\s*호|유\s*형|코\s*드|구\s*분|시\s*간|일\s*시|상\s*태|명\s*세)/;
+  for(let i=0;i<lines.length;i++){
+    const l=lines[i];
+    if(!vendorKw.test(l))continue;
+    let after=l.replace(vendorKw,'').replace(/^[\s:;|*]+/,'');
+    if(leadStop.test(after))continue;
+    const stop=after.match(labelStop);
+    if(stop)after=after.slice(0,stop.index);
+    let v=after.replace(/[:;|*]/g,' ').replace(/\s+/g,' ').trim();
+    if(v.length<2 && i+1<lines.length){
+      const nx=lines[i+1]; // 값이 다음 줄에 분리된 경우
+      if(/[가-힣A-Za-z]/.test(nx)&&!labelStop.test(nx)&&!vendorKw.test(nx)&&!/\d{3}/.test(nx))
+        v=nx.replace(/[:;|*]/g,' ').replace(/\s+/g,' ').trim();
+    }
+    if(v.length>=2 && /[가-힣A-Za-z]/.test(v)){result.vendor=v;break;}
   }
   if(!result.vendor){
+    const ex=/(거\s*래\s*확\s*인|확\s*인\s*[증중징]|영수증|전표|카드|승인|결제|금\s*액|합계|단말|주문|번호|사업자|대표|주소|연락|일시|포인트|할인|상품|운임|운수|pay|kakao|카카오|naver|네이버|toss|토스|페이|정보)/i;
     for(const l of lines){
-      if(l.length>=2 && l.length<=30 && /[가-힣]/.test(l) && !/\d{3}-\d{2}/.test(l) && !/(전표|카드|승인|결제|영수증|금액|합계|단말기)/.test(l)){
-        result.vendor=l.replace(/[:;\|\s]+/g,' ').trim();
+      if(l.length>=2 && l.length<=30 && /[가-힣]/.test(l) && !/\d{3}/.test(l) && !ex.test(l)){
+        result.vendor=l.replace(/[:;|*]/g,' ').replace(/\s+/g,' ').trim();
         break;
       }
     }
   }
 
+  // ---- 계정과목 추정 ----
   const fullText = text.replace(/\s+/g, '').toLowerCase();
-  if(/모텔|호텔|motel|hotel|숙박|여관|리조트/.test(fullText)) {
+  if(/모텔|호텔|motel|hotel|숙박|여관|리조트|콘도|펜션/.test(fullText)) {
     result.account = '(판)여비교통비-(국내출장비)';
-  } else if(/택시|taxi|카카오티|티머니|운수|교통/.test(fullText)) {
+  } else if(/택시|taxi|카카오티|티머니|tmoney|운수|교통|버스|지하철|철도|ktx|srt|코레일|주유|충전/.test(fullText)) {
     result.account = '(판)여비교통비-(시내교통비)';
+  } else if(/식당|음식|구내식당|커피|카페|coffee|cafe|베이커리|레스토랑|한식|중식|일식|분식|치킨|피자/.test(fullText)) {
+    result.account = '(판)복리후생비';
+  }
+
+  // ---- 택시 결제는 사용처를 '택시'로 통일 (가맹점명/상품명 기반) ----
+  const taxiKw=/택시|카카오택시|카카오\s*t|카카오모빌리티|이동의\s*즐거움|티머니|tmoney|진모빌리티|우티|uti|타다|tada/i;
+  if(taxiKw.test(text) || taxiKw.test(result.vendor)) {
+    result.vendor = '택시';
   }
 
   return result;
@@ -1298,31 +1372,83 @@ async function cleanupOldImages() {
   }
 }
 
-function resizeImage(file, maxDim = 1600, binarize = false) {
+// 명도 배열에 샤프닝(언샤프) 적용 — 업스케일로 흐려진 글자 경계를 또렷하게
+function sharpenLum(lum, w, h) {
+  const out = new Uint8ClampedArray(lum.length);
+  // 중앙 5, 상하좌우 -1 (합 1) 표준 샤프닝 커널
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      const up = y > 0 ? lum[i - w] : lum[i];
+      const dn = y < h - 1 ? lum[i + w] : lum[i];
+      const lf = x > 0 ? lum[i - 1] : lum[i];
+      const rt = x < w - 1 ? lum[i + 1] : lum[i];
+      out[i] = 5 * lum[i] - up - dn - lf - rt;
+    }
+  }
+  return out;
+}
+
+function resizeImage(file, maxDim = 1600, binarize = false, allowUpscale = false) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
       const img = new Image();
       img.onload = () => {
         let w = img.width, h = img.height;
-        const scale = Math.min(1, maxDim / Math.max(w, h));
+        const maxSide = Math.max(w, h);
+        // OCR용(allowUpscale): 해상도가 낮을수록 적극적으로 확대해 글자를 키움(최대 3.5배),
+        //   너무 크면 축소. 저장용은 축소만.
+        let scale;
+        if (allowUpscale) {
+          const MIN_OCR = 1800, MAX_OCR = 2400, MAX_UP = 3.5;
+          if (maxSide < MIN_OCR) scale = Math.min(MAX_UP, MIN_OCR / maxSide);
+          else if (maxSide > MAX_OCR) scale = MAX_OCR / maxSide;
+          else scale = 1;
+        } else {
+          scale = Math.min(1, maxDim / maxSide);
+        }
+        const didUpscale = scale > 1.01;
         w = Math.round(w * scale);
         h = Math.round(h * scale);
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
         const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high'; // 확대 시 더 매끄러운 보간
         ctx.drawImage(img, 0, 0, w, h);
         if(binarize){
           const imageData = ctx.getImageData(0, 0, w, h);
           const data = imageData.data;
-          for (let i = 0; i < data.length; i += 4) {
-            let v = 0.2126 * data[i] + 0.7152 * data[i+1] + 0.0722 * data[i+2];
-            v = v > 120 ? 255 : 0;
+          // 1) 명도 계산
+          let lum = new Uint8ClampedArray(data.length / 4);
+          for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+            lum[j] = (0.2126 * data[i] + 0.7152 * data[i+1] + 0.0722 * data[i+2]) | 0;
+          }
+          // 1-1) 업스케일한 경우에만 샤프닝(흐린 저해상도 이미지 인식률 향상)
+          if (didUpscale) lum = sharpenLum(lum, w, h);
+          // 2) 히스토그램 + Otsu 자동 임계값(조명/배경에 적응)
+          const hist = new Array(256).fill(0);
+          for (let j = 0; j < lum.length; j++) hist[lum[j]]++;
+          const total = lum.length;
+          let sum = 0; for (let t = 0; t < 256; t++) sum += t * hist[t];
+          let sumB = 0, wB = 0, maxVar = -1, thr = 128;
+          for (let t = 0; t < 256; t++) {
+            wB += hist[t]; if (wB === 0) continue;
+            const wF = total - wB; if (wF === 0) break;
+            sumB += t * hist[t];
+            const mB = sumB / wB, mF = (sum - sumB) / wF;
+            const between = wB * wF * (mB - mF) * (mB - mF);
+            if (between > maxVar) { maxVar = between; thr = t; }
+          }
+          // 3) 이진화
+          for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+            const v = lum[j] > thr ? 255 : 0;
             data[i] = data[i+1] = data[i+2] = v;
           }
           ctx.putImageData(imageData, 0, 0);
         }
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
       };
       img.onerror = reject;
       img.src = reader.result;
@@ -1334,6 +1460,20 @@ function resizeImage(file, maxDim = 1600, binarize = false) {
 
 const ocrProgress=document.getElementById('ocrProgress');
 const ocrBar=document.getElementById('ocrBar');
+
+// Tesseract 워커: 고정밀(best) 한국어 모델 사용. 한 번 만들어 재사용(모델은 브라우저에 캐시됨)
+let ocrWorker=null, ocrWorkerLoading=null;
+async function getOcrWorker(){
+  if(ocrWorker)return ocrWorker;
+  if(!ocrWorkerLoading){
+    ocrWorkerLoading=Tesseract.createWorker('kor+eng', 1, {
+      // 4.0.0_best = 정확도 우선 LSTM 모델(기본 모델보다 큼, 첫 스캔만 느림)
+      langPath:'https://tessdata.projectnaptha.com/4.0.0_best',
+      logger:m=>{ if(m.status==='recognizing text') ocrBar.style.width=Math.round(m.progress*100)+'%'; }
+    }).then(w=>{ ocrWorker=w; return w; });
+  }
+  return ocrWorkerLoading;
+}
 
 receiptBtn.onclick=()=>{
   receiptFile.value='';
@@ -1358,12 +1498,11 @@ async function fillFromReceipt(files){
     ocrBar.style.width='0%';
     try {
       const saveUrl = await resizeImage(file, 1200, false);
-      const imgUrl = await resizeImage(file, 1600, true);
+      const imgUrl = await resizeImage(file, 1800, true, true);
       receiptBtn.textContent=`영수증 분석 중… (${i+1}/${files.length} 텍스트 인식)`;
-      
-      const {data} = await Tesseract.recognize(imgUrl, 'kor+eng', {
-        logger(m){ if(m.status==='recognizing text') ocrBar.style.width=Math.round(m.progress*100)+'%'; }
-      });
+
+      const worker = await getOcrWorker();
+      const {data} = await worker.recognize(imgUrl);
       ocrBar.style.width='100%';
       const r = parseReceipt(data.text);
       clearErrors();
@@ -1568,12 +1707,22 @@ function resetAuthForm() {
   document.getElementById('authPassword').value = '';
   document.getElementById('authPasswordConfirm').value = '';
   document.getElementById('authMessage').style.display = 'none';
+  document.getElementById('forgotPwRow').style.display = 'block';
   clearAuthErrors();
+  showAuthView('auth');
 }
 function clearAuthErrors() {
   document.getElementById('authEmailErr').closest('.field').classList.remove('invalid');
   document.getElementById('authPasswordErr').closest('.field').classList.remove('invalid');
   document.getElementById('authPasswordConfirmErr').closest('.field').classList.remove('invalid');
+}
+
+// 로그인/회원가입 화면(auth)과 비밀번호 재설정 화면(reset) 전환
+function showAuthView(view) {
+  const isReset = view === 'reset';
+  document.querySelector('#authOverlay .tab-header').style.visibility = isReset ? 'hidden' : 'visible';
+  document.getElementById('authForm').style.display = isReset ? 'none' : 'block';
+  document.getElementById('resetForm').style.display = isReset ? 'block' : 'none';
 }
 
 // 탭 선택 변경
@@ -1583,6 +1732,7 @@ document.getElementById('tabLoginBtn').onclick = () => {
   document.getElementById('tabRegisterBtn').classList.remove('active');
   document.getElementById('authConfirmContainer').style.display = 'none';
   document.getElementById('authSubmitBtn').textContent = '로그인';
+  document.getElementById('forgotPwRow').style.display = 'block';
   clearAuthErrors();
 };
 document.getElementById('tabRegisterBtn').onclick = () => {
@@ -1591,6 +1741,7 @@ document.getElementById('tabRegisterBtn').onclick = () => {
   document.getElementById('tabLoginBtn').classList.remove('active');
   document.getElementById('authConfirmContainer').style.display = 'block';
   document.getElementById('authSubmitBtn').textContent = '회원가입';
+  document.getElementById('forgotPwRow').style.display = 'none';
   clearAuthErrors();
 };
 
@@ -1691,6 +1842,143 @@ document.getElementById('authForm').onsubmit = async (e) => {
     msgEl.textContent = '서버 통신 오류가 발생했습니다.';
   } finally {
     setLoading(submitBtn, false, originalText);
+  }
+};
+
+/* --- 비밀번호 재설정 (이메일 인증 코드) --- */
+let resetStage = 'request'; // 'request' = 코드 요청, 'verify' = 코드 검증/변경
+
+function clearResetErrors() {
+  ['resetEmailErr','resetCodeErr','resetPasswordErr','resetPasswordConfirmErr'].forEach(id => {
+    document.getElementById(id).closest('.field').classList.remove('invalid');
+  });
+}
+function resetResetForm() {
+  resetStage = 'request';
+  document.getElementById('resetEmail').value = '';
+  document.getElementById('resetEmail').disabled = false;
+  document.getElementById('resetCode').value = '';
+  document.getElementById('resetPassword').value = '';
+  document.getElementById('resetPasswordConfirm').value = '';
+  document.getElementById('resetCodeStep').style.display = 'none';
+  document.getElementById('resetPwStep').style.display = 'none';
+  document.getElementById('resetPwConfirmStep').style.display = 'none';
+  document.getElementById('resetMessage').style.display = 'none';
+  document.getElementById('resetSubmitBtn').textContent = '인증 코드 받기';
+  clearResetErrors();
+}
+
+document.getElementById('forgotPwLink').onclick = () => {
+  resetResetForm();
+  // 로그인 화면에 입력한 이메일이 있으면 이어받기
+  const email = document.getElementById('authEmail').value.trim();
+  if (email) document.getElementById('resetEmail').value = email;
+  showAuthView('reset');
+};
+document.getElementById('backToLoginLink').onclick = () => {
+  showAuthView('auth');
+};
+
+document.getElementById('resetForm').onsubmit = async (e) => {
+  e.preventDefault();
+  clearResetErrors();
+  const email = document.getElementById('resetEmail').value.trim();
+  const msgEl = document.getElementById('resetMessage');
+  msgEl.className = 'auth-message';
+  msgEl.style.display = 'none';
+  msgEl.textContent = '';
+
+  const submitBtn = document.getElementById('resetSubmitBtn');
+  const pwdRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+
+  if (resetStage === 'request') {
+    if (!email || !email.includes('@')) {
+      document.getElementById('resetEmailErr').closest('.field').classList.add('invalid');
+      return;
+    }
+    setLoading(submitBtn, true, '인증 코드 받기');
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        resetStage = 'verify';
+        document.getElementById('resetEmail').disabled = true;
+        document.getElementById('resetCodeStep').style.display = 'block';
+        document.getElementById('resetPwStep').style.display = 'block';
+        document.getElementById('resetPwConfirmStep').style.display = 'block';
+        msgEl.className = 'auth-message success';
+        msgEl.style.display = 'block';
+        msgEl.textContent = data.message || '인증 코드를 보냈습니다. 메일함을 확인해주세요.';
+      } else {
+        msgEl.className = 'auth-message error';
+        msgEl.style.display = 'block';
+        msgEl.textContent = data.error || '인증 코드 발송에 실패했습니다.';
+      }
+    } catch (err) {
+      console.error(err);
+      msgEl.className = 'auth-message error';
+      msgEl.style.display = 'block';
+      msgEl.textContent = '서버 통신 오류가 발생했습니다.';
+    } finally {
+      // 코드 발송 성공 시 stage가 'verify'로 바뀌므로 버튼 라벨도 그에 맞춰 복원
+      setLoading(submitBtn, false, resetStage === 'verify' ? '비밀번호 변경' : '인증 코드 받기');
+    }
+    return;
+  }
+
+  // resetStage === 'verify'
+  const code = document.getElementById('resetCode').value.trim();
+  const password = document.getElementById('resetPassword').value;
+  const confirmPassword = document.getElementById('resetPasswordConfirm').value;
+  let hasErr = false;
+  if (!code) {
+    document.getElementById('resetCodeErr').closest('.field').classList.add('invalid');
+    hasErr = true;
+  }
+  if (!pwdRegex.test(password)) {
+    document.getElementById('resetPasswordErr').closest('.field').classList.add('invalid');
+    hasErr = true;
+  }
+  if (password !== confirmPassword) {
+    document.getElementById('resetPasswordConfirmErr').closest('.field').classList.add('invalid');
+    hasErr = true;
+  }
+  if (hasErr) return;
+
+  setLoading(submitBtn, true, '비밀번호 변경');
+  try {
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code, password })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      msgEl.className = 'auth-message success';
+      msgEl.style.display = 'block';
+      msgEl.textContent = data.message || '비밀번호가 변경되었습니다. 로그인해주세요.';
+      setTimeout(() => {
+        resetResetForm();
+        document.getElementById('authEmail').value = email;
+        document.getElementById('authPassword').value = '';
+        showAuthView('auth');
+      }, 1500);
+    } else {
+      msgEl.className = 'auth-message error';
+      msgEl.style.display = 'block';
+      msgEl.textContent = data.error || '비밀번호 재설정에 실패했습니다.';
+    }
+  } catch (err) {
+    console.error(err);
+    msgEl.className = 'auth-message error';
+    msgEl.style.display = 'block';
+    msgEl.textContent = '서버 통신 오류가 발생했습니다.';
+  } finally {
+    setLoading(submitBtn, false, '비밀번호 변경');
   }
 };
 
