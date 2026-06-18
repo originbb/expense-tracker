@@ -231,25 +231,35 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       args: [email]
     });
 
-    // 가입된 이메일일 때만 코드 발송 (이메일 존재 여부 노출 방지를 위해 응답은 항상 동일)
     if (userResult.rows.length > 0) {
-      const code = String(crypto.randomInt(100000, 1000000)); // 6자리
+      // Node 구버전 호환성을 위해 Math.random 사용 (보안상 매우 중요한 키가 아니므로 무방)
+      const code = String(Math.floor(100000 + Math.random() * 900000));
       const codeHash = await bcrypt.hash(code, 10);
       const expiresAt = Date.now() + 10 * 60 * 1000; // 10분
 
-      await db.execute({
-        sql: `INSERT INTO password_resets (email, code_hash, expires_at, attempts) VALUES (?, ?, ?, 0)
-              ON CONFLICT(email) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at, attempts = 0`,
-        args: [email, codeHash, expiresAt]
-      });
+      try {
+        await db.execute({
+          sql: `INSERT INTO password_resets (email, code_hash, expires_at, attempts) VALUES (?, ?, ?, 0)
+                ON CONFLICT(email) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at, attempts = 0`,
+          args: [email, codeHash, expiresAt]
+        });
+      } catch (dbErr) {
+        console.error('DB Error:', dbErr);
+        return res.status(500).json({ error: 'DB에 인증 코드를 저장하는 중 오류 발생: ' + (dbErr.message || dbErr) });
+      }
 
-      await sendResetCodeMail(email, code);
+      try {
+        await sendResetCodeMail(email, code);
+      } catch (mailErr) {
+        console.error('Mail Error:', mailErr);
+        return res.status(500).json({ error: '이메일 발송 실패 (SMTP 설정 확인 필요): ' + (mailErr.message || mailErr) });
+      }
     }
 
     res.json({ message: '가입된 이메일이라면 인증 코드를 보내드렸습니다. 메일함을 확인해주세요.' });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: '인증 코드 발송 중 오류가 발생했습니다.' });
+    console.error('General Error:', err);
+    res.status(500).json({ error: '서버 내부 오류: ' + (err.message || err) });
   }
 });
 
@@ -303,7 +313,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
     res.json({ message: '비밀번호가 변경되었습니다. 새 비밀번호로 로그인해주세요.' });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: '비밀번호 재설정 중 오류가 발생했습니다.' });
+    res.status(500).json({ error: '비밀번호 변경 중 오류: ' + (err.message || err) });
   }
 });
 
