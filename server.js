@@ -5,6 +5,8 @@ import path from 'path';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 import { createClient } from '@libsql/client';
 
 dotenv.config();
@@ -62,6 +64,16 @@ async function initDb() {
     )
   `);
 
+  // 비밀번호 재설정 인증 코드 (이메일당 1건, 재요청 시 덮어씀)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS password_resets (
+      email TEXT PRIMARY KEY,
+      code_hash TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      attempts INTEGER DEFAULT 0
+    )
+  `);
+
   console.log('✅ 데이터베이스 테이블 확인 완료');
 }
 initDb().then(() => {
@@ -91,6 +103,42 @@ async function cleanupServerImages() {
   }
 }
 
+
+// --- 이메일 발송 설정 ---
+// SMTP 환경변수가 있으면 실제 발송, 없으면 콘솔에 출력(개발/테스트용 폴백)
+const smtpConfigured = !!process.env.SMTP_HOST;
+const mailer = smtpConfigured
+  ? nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: process.env.SMTP_SECURE === 'true', // 465 포트면 true
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 10000,
+      auth: process.env.SMTP_USER
+        ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+        : undefined
+    })
+  : null;
+const MAIL_FROM = process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@expense-tracker.local';
+
+async function sendResetCodeMail(email, code) {
+  const subject = '[경비 전표] 비밀번호 재설정 인증 코드';
+  const text = `비밀번호 재설정 인증 코드는 [${code}] 입니다.\n10분 이내에 입력해 주세요.\n\n본인이 요청하지 않았다면 이 메일을 무시하세요.`;
+  const html = `
+    <div style="font-family:-apple-system,'Apple SD Gothic Neo',sans-serif;max-width:480px;margin:0 auto;padding:24px;">
+      <h2 style="font-size:18px;color:#1d1d1f;">비밀번호 재설정 인증 코드</h2>
+      <p style="font-size:14px;color:#6e6e73;">아래 인증 코드를 입력해 비밀번호를 재설정하세요. (유효시간 10분)</p>
+      <div style="font-size:32px;font-weight:700;letter-spacing:8px;color:#0071e3;text-align:center;padding:20px;background:#f0f0f3;border-radius:12px;margin:16px 0;">${code}</div>
+      <p style="font-size:12px;color:#a1a1a6;">본인이 요청하지 않았다면 이 메일을 무시하세요.</p>
+    </div>`;
+
+  if (!mailer) {
+    console.log(`📧 [메일 폴백] ${email} 비밀번호 재설정 인증 코드: ${code} (유효 10분)`);
+    return;
+  }
+  await mailer.sendMail({ from: MAIL_FROM, to: email, subject, text, html });
+}
 
 // 인증 미들웨어
 function authenticateToken(req, res, next) {
@@ -167,6 +215,95 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: '로그인 중 오류가 발생했습니다.' });
+  }
+});
+
+// 비밀번호 재설정 - 인증 코드 요청
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ error: '이메일 주소를 올바르게 입력해주세요.' });
+  }
+
+  try {
+    const userResult = await db.execute({
+      sql: 'SELECT id FROM users WHERE email = ?',
+      args: [email]
+    });
+
+    // 가입된 이메일일 때만 코드 발송 (이메일 존재 여부 노출 방지를 위해 응답은 항상 동일)
+    if (userResult.rows.length > 0) {
+      const code = String(crypto.randomInt(100000, 1000000)); // 6자리
+      const codeHash = await bcrypt.hash(code, 10);
+      const expiresAt = Date.now() + 10 * 60 * 1000; // 10분
+
+      await db.execute({
+        sql: `INSERT INTO password_resets (email, code_hash, expires_at, attempts) VALUES (?, ?, ?, 0)
+              ON CONFLICT(email) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at, attempts = 0`,
+        args: [email, codeHash, expiresAt]
+      });
+
+      await sendResetCodeMail(email, code);
+    }
+
+    res.json({ message: '가입된 이메일이라면 인증 코드를 보내드렸습니다. 메일함을 확인해주세요.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '인증 코드 발송 중 오류가 발생했습니다.' });
+  }
+});
+
+// 비밀번호 재설정 - 코드 검증 및 새 비밀번호 설정
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { email, code, password } = req.body;
+  if (!email || !code || !password) {
+    return res.status(400).json({ error: '이메일, 인증 코드, 새 비밀번호를 모두 입력해주세요.' });
+  }
+  const pwdRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+  if (!pwdRegex.test(password)) {
+    return res.status(400).json({ error: '비밀번호는 영문, 숫자, 특수문자를 포함해 최소 8자 이상이어야 합니다.' });
+  }
+
+  try {
+    const result = await db.execute({
+      sql: 'SELECT code_hash, expires_at, attempts FROM password_resets WHERE email = ?',
+      args: [email]
+    });
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ error: '인증 코드를 먼저 요청해주세요.' });
+    }
+
+    const row = result.rows[0];
+    if (Number(row.expires_at) < Date.now()) {
+      await db.execute({ sql: 'DELETE FROM password_resets WHERE email = ?', args: [email] });
+      return res.status(400).json({ error: '인증 코드가 만료되었습니다. 다시 요청해주세요.' });
+    }
+    if (Number(row.attempts) >= 5) {
+      await db.execute({ sql: 'DELETE FROM password_resets WHERE email = ?', args: [email] });
+      return res.status(400).json({ error: '인증 시도 횟수를 초과했습니다. 코드를 다시 요청해주세요.' });
+    }
+
+    const validCode = await bcrypt.compare(String(code), row.code_hash);
+    if (!validCode) {
+      await db.execute({
+        sql: 'UPDATE password_resets SET attempts = attempts + 1 WHERE email = ?',
+        args: [email]
+      });
+      return res.status(400).json({ error: '인증 코드가 일치하지 않습니다.' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    await db.execute({
+      sql: 'UPDATE users SET password_hash = ? WHERE email = ?',
+      args: [passwordHash, email]
+    });
+    await db.execute({ sql: 'DELETE FROM password_resets WHERE email = ?', args: [email] });
+
+    res.json({ message: '비밀번호가 변경되었습니다. 새 비밀번호로 로그인해주세요.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '비밀번호 재설정 중 오류가 발생했습니다.' });
   }
 });
 
@@ -300,6 +437,7 @@ app.post('/api/expenses/sync', authenticateToken, async (req, res) => {
           exp.vendor || ''
         ]
       });
+      const newId = Number(result.lastInsertRowid);
       syncedItems.push({
         id: newId,
         date: exp.date,

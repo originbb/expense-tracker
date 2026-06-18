@@ -637,6 +637,9 @@
   </div>
 
 <script>
+if (window.location.protocol === 'file:') {
+  alert('이 페이지는 서버를 통해 실행해야 합니다. 터미널에서 서버를 실행한 뒤 (예: npm start) 브라우저에서 http://localhost:12345 (또는 설정한 포트)로 접속해주세요.');
+}
 const themeBtn = document.getElementById('themeToggleBtn');
 const moonSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`;
 const sunSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>`;
@@ -701,7 +704,7 @@ async function loadEntries() {
         return;
       }
     } catch(e) {
-      console.error('서버 데이터 로드 실패, 로컬 임시 데이터 사용:', e);
+      console.error('서버 데이터 로드 실패, 로컬 임시 데이터 사용:', e.message);
     }
   }
   // 게스트 모드
@@ -905,7 +908,7 @@ document.getElementById('confirmDelete').onclick=async()=>{
           return;
         }
       } catch (err) {
-        console.error(err);
+        console.error(err.message);
         alert('서버 통신 오류가 발생했습니다.');
         flashSave('삭제 실패');
         closeConfirm();
@@ -918,7 +921,7 @@ document.getElementById('confirmDelete').onclick=async()=>{
     }
     
     renderAll();
-    deleteImage(pendingDeleteId).catch(e=>console.error(e));
+    deleteImage(pendingDeleteId).catch(e=>console.error(e.message));
     if(document.getElementById('dayOverlay').classList.contains('open'))renderDayModal();
   }
   closeConfirm();
@@ -1095,7 +1098,7 @@ async function submitEntry(){
         return false;
       }
     } catch (err) {
-      console.error(err);
+      console.error(err.message);
       alert('서버 통신 오류가 발생했습니다.');
       flashSave('저장 실패');
       return false;
@@ -1282,7 +1285,7 @@ async function saveImage(id, dataUrl){
       });
       return;
     } catch(e) {
-      console.error('서버 이미지 업로드 실패:', e);
+      console.error('서버 이미지 업로드 실패:', e.message);
     }
   }
 
@@ -1368,7 +1371,7 @@ async function cleanupOldImages() {
       }
     };
   } catch (e) {
-    console.error('영수증 이미지 자동 정리에 실패했습니다:', e);
+    console.error('영수증 이미지 자동 정리에 실패했습니다:', e.message);
   }
 }
 
@@ -1560,7 +1563,7 @@ async function fillFromReceipt(files){
       }
       successCount++;
     } catch(err) {
-      console.error('OCR 오류:', err);
+      console.error('OCR 오류:', err.message);
     }
   }
   
@@ -1623,7 +1626,7 @@ document.getElementById('downloadZipBtn').onclick=async()=>{
       saveAs(content, `영수증_${monthStr()}.zip`);
     }
   } catch(err){
-    console.error(err);
+    console.error(err.message);
     alert('ZIP 생성 중 오류가 발생했습니다.');
   } finally {
     btn.textContent = origText;
@@ -1837,9 +1840,9 @@ document.getElementById('authForm').onsubmit = async (e) => {
       }
     }
   } catch (err) {
-    console.error(err);
+    console.error(err.message);
     msgEl.classList.add('error');
-    msgEl.textContent = '서버 통신 오류가 발생했습니다.';
+    msgEl.textContent = '서버 통신 오류: ' + (err.message || '알 수 없는 오류');
   } finally {
     setLoading(submitBtn, false, originalText);
   }
@@ -1919,10 +1922,10 @@ document.getElementById('resetForm').onsubmit = async (e) => {
         msgEl.textContent = data.error || '인증 코드 발송에 실패했습니다.';
       }
     } catch (err) {
-      console.error(err);
+      console.error(err.message);
       msgEl.className = 'auth-message error';
       msgEl.style.display = 'block';
-      msgEl.textContent = '서버 통신 오류가 발생했습니다.';
+      msgEl.textContent = '서버 통신 오류: ' + (err.message || '알 수 없는 오류');
     } finally {
       // 코드 발송 성공 시 stage가 'verify'로 바뀌므로 버튼 라벨도 그에 맞춰 복원
       setLoading(submitBtn, false, resetStage === 'verify' ? '비밀번호 변경' : '인증 코드 받기');
@@ -1973,10 +1976,10 @@ document.getElementById('resetForm').onsubmit = async (e) => {
       msgEl.textContent = data.error || '비밀번호 재설정에 실패했습니다.';
     }
   } catch (err) {
-    console.error(err);
+    console.error(err.message);
     msgEl.className = 'auth-message error';
     msgEl.style.display = 'block';
-    msgEl.textContent = '서버 통신 오류가 발생했습니다.';
+    msgEl.textContent = '서버 통신 오류: ' + (err.message || '알 수 없는 오류');
   } finally {
     setLoading(submitBtn, false, '비밀번호 변경');
   }
