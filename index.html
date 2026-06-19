@@ -501,8 +501,11 @@
 
   <!-- ERP LIST -->
   <section id="erpContainer" class="card list-card" style="margin-bottom: 24px;">
-    <div class="list-head" style="background: var(--surface-2);">
-      <h2 id="listTitleErp">분개전표입력</h2><span class="count" id="listCountErp"></span>
+    <div class="list-head" style="display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <h2 id="listTitleErp">분개전표입력</h2><span class="count" id="listCountErp"></span>
+      </div>
+      <button class="btn btn-ghost" id="deleteAllBtn" style="color:var(--red); font-size:13px; height:28px; padding:0 8px;">해당월 일괄 삭제</button>
     </div>
     <div style="display: flex; gap: 24px; padding: 12px 20px; background: #fff; border-bottom: 1px solid var(--line-2);">
       <div style="font-size: 13px; display: flex; align-items: center; gap: 8px;">
@@ -510,7 +513,7 @@
         <span id="erpAccountingDate" style="font-weight: 700; color: var(--blue);"></span>
       </div>
     </div>
-    <div class="table-scroll" style="padding-right: 12px;">
+    <div class="table-scroll">
       <table style="min-width: 900px;">
         <thead>
           <tr>
@@ -774,10 +777,7 @@
           <label>이름 (사원명) <span style="font-size: 12px; color: var(--ink-2); font-weight: normal; margin-left: 6px;">(선택)</span></label>
           <input type="text" id="profileName" placeholder="예: 홍길동">
         </div>
-        <div class="field c12" style="margin-bottom: 10px;">
-          <label>소속 팀 (귀속부서)</label>
-          <input type="text" id="profileTeam" placeholder="예: 브랜드전략디자인팀">
-        </div>
+        <!-- Team field removed per user request -->
         <button class="btn btn-primary" id="profileUpdateBtn" style="width:100%; height:44px; grid-column: span 12;">정보 수정</button>
       </div>
       <div style="display:flex; flex-direction:column; gap:10px;">
@@ -1119,6 +1119,42 @@ document.getElementById('confirmDelete').onclick=async()=>{
     if(document.getElementById('dayOverlay').classList.contains('open'))renderDayModal();
   }
   closeConfirm();
+};
+
+document.getElementById('deleteAllBtn').onclick = async () => {
+  const rows = filtered();
+  if (rows.length === 0) { alert('삭제할 전표가 없습니다.'); return; }
+  const y = viewDate.getFullYear();
+  const m = viewDate.getMonth() + 1;
+  if (!confirm(`현재 월(${y}년 ${m}월)의 전표 ${rows.length}건을 모두 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+
+  flashSave('일괄 삭제 중...');
+  const deleteAllBtn = document.getElementById('deleteAllBtn');
+  const origText = deleteAllBtn.textContent;
+  deleteAllBtn.textContent = '삭제 중...';
+  deleteAllBtn.disabled = true;
+
+  try {
+    const rowIds = rows.map(r => String(r.id));
+    if (isLoggedIn()) {
+      for (const id of rowIds) {
+        await fetch(`/api/expenses/${id}`, { method: 'DELETE', headers: getHeaders() });
+      }
+    }
+    entries = entries.filter(x => !rowIds.includes(String(x.id)));
+    if (!isLoggedIn()) localStorage.setItem(STORAGE_KEY,JSON.stringify(entries));
+    for (const id of rowIds) {
+      deleteImage(id).catch(e=>console.error(e.message));
+    }
+    flashSave('삭제 완료');
+    renderAll();
+  } catch (err) {
+    console.error(err);
+    alert('삭제 중 오류가 발생했습니다.');
+  } finally {
+    deleteAllBtn.textContent = origText;
+    deleteAllBtn.disabled = false;
+  }
 };
 document.getElementById('confirmOverlay').addEventListener('click',e=>{
   if(e.target.id==='confirmOverlay')closeConfirm();
