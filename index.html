@@ -1062,9 +1062,11 @@ function filtered(){
     .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
 }
 
+let currentReceiptViewId = null;
 function resetReceiptViewer() {
   const viewer = document.getElementById('receiptViewerContent');
   if (!viewer) return;
+  currentReceiptViewId = null;
   viewer.innerHTML = `
     <div class="receipt-placeholder">
       <div style="font-size: 32px; margin-bottom: 12px;">📄</div>
@@ -1075,7 +1077,13 @@ function resetReceiptViewer() {
 async function showReceiptInViewer(id) {
   const viewer = document.getElementById('receiptViewerContent');
   if (!viewer) return;
-  viewer.innerHTML = '<div class="spinner" style="border-color:var(--blue); border-top-color:transparent;"></div> <span style="color:var(--ink-2);font-size:13px;">이미지 불러오는 중...</span>';
+  currentReceiptViewId = id;
+  viewer.innerHTML = `
+    <div class="receipt-placeholder" style="display:flex;flex-direction:column;align-items:center;gap:10px;">
+      <div class="spinner" style="width:22px;height:22px;border-width:3px;border-color:var(--blue);border-top-color:transparent;margin:0;"></div>
+      <span>이미지 불러오는 중...</span>
+    </div>
+  `;
   try {
     const dataUrl = await getImage(id);
     if (dataUrl) {
@@ -1233,6 +1241,7 @@ document.getElementById('confirmDelete').onclick=async()=>{
       }
       renderAll();
       if (document.getElementById('dayOverlay').classList.contains('open')) renderDayModal();
+      if (String(currentReceiptViewId) === String(pendingDeleteId)) resetReceiptViewer();
       deleteImage(pendingDeleteId).catch(e => console.error(e.message));
       closeConfirm();
     } catch (err) {
