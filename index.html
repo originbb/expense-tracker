@@ -514,7 +514,7 @@
     </button>
     <div class="export-menu" id="exportMenu" style="position: relative;">
       <button class="btn btn-ghost" id="exportMenuBtn" aria-haspopup="true" aria-expanded="false" style="height: 36px; font-weight: 600; font-size: 14px; border: 1px solid var(--line-2); background: #fff; color: var(--ink);">
-        📥 데이터 내보내기 <span style="font-size:11px;opacity:.7;">▾</span>
+        📥 내보내기 <span style="font-size:11px;opacity:.7;">▾</span>
       </button>
       <div class="export-dropdown" id="exportDropdown">
         <button class="export-item" id="exportBtn">📊 엑셀로 내보내기</button>
@@ -545,9 +545,9 @@
       <div>
         <h2 id="listTitleErp">분개전표입력</h2><span class="count" id="listCountErp"></span>
       </div>
-      <div style="display: flex; gap: 4px; align-items: center;">
-        <button class="btn btn-ghost" onclick="newEntry()" style="color:var(--blue); font-size:13px; height:28px; padding:0 8px;">+ 추가</button>
-        <button class="btn btn-ghost" id="deleteAllBtn" style="color:var(--red); font-size:13px; height:28px; padding:0 8px;">일괄삭제</button>
+      <div style="display: flex; gap: 6px; align-items: center;">
+        <button class="nav-btn" onclick="newEntry()" title="수동 전표 추가" style="width:30px; height:30px; font-size:14px;">➕</button>
+        <button class="nav-btn" id="deleteAllBtn" title="해당 월 일괄 삭제" style="width:30px; height:30px; font-size:14px; color:var(--red); border-color:var(--line);">🗑️</button>
       </div>
     </div>
     <div style="display: flex; gap: 24px; padding: 12px 20px; background: #fff; border-bottom: 1px solid var(--line-2);">
@@ -2567,7 +2567,7 @@ function updateAuthUI() {
   } else {
     container.innerHTML = `
       <div class="auth-badge guest" id="navLoginBtn">
-        ⚠️ 게스트 모드 (동기화)
+        ⚠️ 게스트
       </div>
     `;
     
