@@ -1251,9 +1251,7 @@ document.getElementById('deleteAllBtn').onclick = async () => {
 
   flashSave('일괄 삭제 중...');
   const deleteAllBtn = document.getElementById('deleteAllBtn');
-  const origText = deleteAllBtn.textContent;
-  deleteAllBtn.textContent = '삭제 중...';
-  deleteAllBtn.disabled = true;
+  setIconBtnLoading(deleteAllBtn, true);
 
   try {
     const rowIds = rows.map(r => String(r.id));
@@ -1273,8 +1271,7 @@ document.getElementById('deleteAllBtn').onclick = async () => {
     console.error(err);
     alert('삭제 중 오류가 발생했습니다.');
   } finally {
-    deleteAllBtn.textContent = origText;
-    deleteAllBtn.disabled = false;
+    setIconBtnLoading(deleteAllBtn, false);
   }
 };
 document.getElementById('confirmOverlay').addEventListener('click',e=>{
