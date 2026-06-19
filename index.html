@@ -1066,7 +1066,7 @@ async function showReceiptInViewer(id) {
 function renderList(){
   const rows=filtered();
   const y=viewDate.getFullYear(),m=viewDate.getMonth()+1;
-  const label=`${y}년 ${m}월 전체`;
+  const label=`${String(y).slice(2)}년 ${m}월`;
   document.getElementById('downloadZipBtn').textContent=`${m}월 영수증 다운로드`;
 
   const td=rows.reduce((s,e)=>s+Number(e.debit||0),0);
