@@ -143,7 +143,7 @@
   .list-head .count{font-size:12px;color:var(--ink-3);font-weight:500;margin-left:8px;}
   .table-scroll{overflow-x:auto;}
   table{width:100%;border-collapse:collapse;min-width:860px;table-layout:fixed;}
-  th{font-size:11px;font-weight:600;color:var(--ink-3);text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap;letter-spacing:.02em;background:var(--surface-2);}
+  th{font-size:13px;font-weight:600;color:var(--ink);text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap;letter-spacing:.02em;background:var(--surface-2);}
   th.r,td.r{text-align:right;}
   td{font-size:13px;padding:11px 12px;border-bottom:1px solid var(--line);color:var(--ink);vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   th:first-child,td:first-child{padding-left:22px;padding-right:4px;}
@@ -152,7 +152,7 @@
   tr.row:hover{background:var(--surface-2);}
   td.debit{color:var(--debit);font-weight:600;font-variant-numeric:tabular-nums;}
   td.credit{color:var(--credit);font-weight:600;font-variant-numeric:tabular-nums;}
-  td.muted{color:var(--ink-3);}
+  td.muted{color:var(--ink);}
   .tag{display:inline-block;font-size:11px;font-weight:600;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:2px 7px;}
   .row-act{display:flex;gap:8px;}
   .icon-btn{width:36px;height:36px;border:1px solid var(--line);background:var(--surface);border-radius:10px;cursor:pointer;font-size:16px;line-height:normal;color:var(--ink-2);transition:.13s;display:inline-flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;flex:0 0 auto;}
@@ -317,9 +317,7 @@
     color: var(--credit);
     border: 1px solid rgba(255,59,48,.22);
   }
-
-
-  @media(max-width:680px){
+@media(max-width:680px){
     .wrap{padding:16px 12px 56px;}
 
     /* 1. 히어로 압축 + 헤더 grid 배치 (제목|토글 / 배지) */
@@ -360,19 +358,100 @@
     .field input,.field select{height:46px;}
     .auth-badge{padding:13px 15px;}
   }
+
+  /* ERP Form Layout */
+  #erpPreviewPanel { overflow-x: auto; }
+  .erp-preview-wrap { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+  .erp-left-col { flex: 1 1 500px; min-width: 280px; }
+  .erp-right-col { flex: 1 1 250px; min-width: 180px; display: flex; flex-direction: column; }
+  
+  .erp-grid { 
+    display: grid; 
+    grid-template-columns: 90px 1.5fr 80px 1fr; 
+    row-gap: 10px; 
+    column-gap: 12px; 
+    align-items: center; 
+  }
+  .erp-grid-right {
+    display: grid; 
+    grid-template-columns: 110px 160px; 
+    row-gap: 10px; 
+    column-gap: 12px; 
+    align-items: center;
+  }
+  .erp-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-2);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .erp-input {
+    height: 28px;
+    border: 1px solid var(--line-2);
+    border-radius: 4px;
+    padding: 0 8px;
+    font-size: 13px;
+    color: var(--ink);
+    background: #ffffff;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .erp-input:read-only, .erp-input:disabled {
+    background: var(--surface-2);
+    color: var(--ink-2);
+  }
+  .erp-select {
+    height: 28px;
+    border: 1px solid var(--line-2);
+    border-radius: 4px;
+    padding: 0 24px 0 8px;
+    font-size: 13px;
+    color: var(--ink);
+    background: #ffffff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%238E8E93' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 8px center;
+    appearance: none;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .erp-btn {
+    height: 28px;
+    border: 1px solid var(--line-2);
+    background: var(--surface-2);
+    color: var(--ink);
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 4px;
+    padding: 0 10px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  
+  .erp-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .erp-table th { background: var(--surface-2); padding: 8px 12px; text-align: left; font-size: 12px; font-weight: 600; color: var(--ink-2); border: none; }
+  .erp-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--ink); word-break: break-all; }
+  
+  .erp-summary-wrap { display: flex; gap: 24px; align-items: stretch; }
+  .erp-summary-section { flex: 1; }
+  .erp-summary-title { font-size: 12px; font-weight: 600; color: var(--ink-2); margin-bottom: 8px; }
+  .erp-summary-inputs { display: flex; gap: 8px; }
+  .erp-summary-inputs .erp-input { flex: 1; height: 32px; font-weight: 500; }
+  .erp-summary-inputs .erp-input.num { text-align: right; }
+
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="top">
-    <div class="title-wrap">
-      <h1>영수증 스캔하면 끝! 초간단 전표 정리</h1>
+    <div class="title-wrap" style="flex: 1;">
+      <h1>영수증 스캔하면 끝! <span style="display: inline-block;">초간단 전표 정리</span></h1>
       <div class="sub">영수증을 찰칵 스캔하면 달력 위에 날짜별로 전표가 자동 등록됩니다. 오늘부터 경비 처리 3초 컷 하세요!</div>
     </div>
-    <button id="themeToggleBtn" class="nav-btn" title="테마 변경"></button>
-    <div class="header-status">
-      <span class="sub" id="saveState">저장됨</span>
-      <div id="authStatusContainer" class="auth-status-container"></div>
+    <div style="display: flex; align-items: flex-start; gap: 12px; margin-left: auto; flex-shrink: 0;">
+      <button id="themeToggleBtn" class="nav-btn" title="테마 변경"></button>
+      <div class="header-status" style="display: flex; align-items: center; gap: 8px;">
+        <span class="sub" id="saveState" style="margin-right: 4px;">저장됨</span>
+        <div id="authStatusContainer" class="auth-status-container"></div>
+      </div>
     </div>
   </header>
 
@@ -386,60 +465,113 @@
     <input type="file" id="receiptFile" accept="image/*" multiple hidden>
   </div>
 
-  <!-- CALENDAR -->
-  <section class="card cal">
-    <div class="cal-head">
-      <div class="cal-title" id="calTitle">2025년 7월</div>
-      <div class="cal-nav">
-        <button class="today-btn" id="todayBtn">오늘</button>
-        <button class="nav-btn" id="prevBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
-        <button class="nav-btn" id="nextBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
-      </div>
-    </div>
-    <div class="grid" id="dowRow"></div>
-    <div class="grid" id="calGrid"></div>
-  </section>
+  
 
   <!-- TOOLBAR -->
-  <div class="toolbar" style="justify-content: flex-end;">
-    <div class="export-menu" id="exportMenu">
-      <button class="btn btn-ghost" id="exportMenuBtn" aria-haspopup="true" aria-expanded="false">내보내기 <span style="font-size:11px;opacity:.7;">▾</span></button>
+  <div class="toolbar" style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 16px;">
+    <button class="btn btn-ghost" id="btnToggleCal" style="height: 32px; font-weight: 500; font-size: 13px; border: none; background: transparent; color: var(--ink-2); padding: 0 8px;">
+      📅 달력 펼치기 ▼
+    </button>
+    <div class="export-menu" id="exportMenu" style="position: relative;">
+      <button class="btn btn-ghost" id="exportMenuBtn" aria-haspopup="true" aria-expanded="false" style="height: 36px; font-weight: 600; font-size: 14px; border: 1px solid var(--line-2); background: #fff; color: var(--ink);">
+        📥 데이터 내보내기 <span style="font-size:11px;opacity:.7;">▾</span>
+      </button>
       <div class="export-dropdown" id="exportDropdown">
         <button class="export-item" id="exportBtn">📊 엑셀로 내보내기</button>
-        <button class="export-item" id="downloadZipBtn">🧾 해당달 영수증 다운</button>
+        <button class="export-item" id="downloadZipBtn">🧾 해당월 영수증 다운로드</button>
       </div>
     </div>
   </div>
 
-  <!-- LIST -->
-  <section class="card list-card">
-    <div class="list-head">
-      <h2 id="listTitle">전체 전표</h2><span class="count" id="listCount"></span>
+  <!-- CALENDAR (Hidden by default) -->
+  <div id="calContainer" style="display: none;">
+    <section class="card cal">
+      <div class="cal-head">
+        <div class="cal-title" id="calTitle">2025년 7월</div>
+        <div class="cal-nav">
+          <button class="today-btn" id="todayBtn">오늘</button>
+          <button class="nav-btn" id="prevBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+          <button class="nav-btn" id="nextBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+        </div>
+      </div>
+      <div class="grid" id="dowRow"></div>
+      <div class="grid" id="calGrid"></div>
+    </section>
+  </div>
+
+  <!-- ERP LIST -->
+  <section id="erpContainer" class="card list-card" style="margin-bottom: 24px;">
+    <div class="list-head" style="background: var(--surface-2);">
+      <h2 id="listTitleErp">분개전표입력</h2><span class="count" id="listCountErp"></span>
     </div>
-    <div class="table-scroll">
-      <table>
+    <div style="display: flex; gap: 24px; padding: 12px 20px; background: #fff; border-bottom: 1px solid var(--line-2);">
+      <div style="font-size: 13px; display: flex; align-items: center; gap: 8px;">
+        <span style="font-weight: 600; color: var(--ink-2);">회계일</span>
+        <span id="erpAccountingDate" style="font-weight: 700; color: var(--blue);"></span>
+      </div>
+    </div>
+    <div class="table-scroll" style="padding-right: 12px;">
+      <table style="min-width: 900px;">
         <thead>
           <tr>
-            <th style="width:60px">행</th>
+            <th style="width:60px">행번호</th>
             <th style="width:180px">계정과목</th>
-            <th class="r" style="width:88px">차변금액</th>
-            <th class="r" style="width:88px">대변금액</th>
-            <th>적요</th>
-            <th style="width:140px">사용처</th>
-            <th style="width:140px"></th>
+            <th style="width:80px">비용구분</th>
+            <th class="r" style="width:100px">차변금액</th>
+            <th class="r" style="width:100px">대변금액</th>
+            <th style="width:250px">적요</th>
+            <th class="sticky-col" style="text-align:center;">작업</th>
           </tr>
         </thead>
-        <tbody id="tbody"></tbody>
-        <tfoot id="tfoot"></tfoot>
+        <tbody id="tbodyErp"></tbody>
+        <tfoot id="tfootErp"></tfoot>
       </table>
     </div>
-    <div class="empty-state" id="emptyState" style="display:none">
+    <div class="empty-state" id="emptyStateErp" style="display:none">
       <div class="big">📋</div>
       <div style="font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 8px;">해당 월에 등록된 전표 내역이 없습니다.</div>
-      <div style="font-size: 13px; line-height: 1.5; color: var(--ink-2);">영수증을 스캔하거나 달력의 <strong>날짜</strong>를 눌러<br>경비 정산을 시작해 보세요!</div>
+      <div style="font-size: 13px; line-height: 1.5; color: var(--ink-2);">영수증을 스캔하여 경비 정산을 시작해 보세요!</div>
     </div>
   </section>
 
+  <!-- ERP Bottom Preview Panel -->
+  <div class="card" id="erpPreviewPanel" style="padding: 20px; margin-bottom: 16px; min-height: 140px;">
+    <div class="erp-preview-wrap">
+      <!-- Left Form -->
+      <div class="erp-left-col">
+        <div class="erp-grid">
+          <!-- Row 1 -->
+          <div class="erp-label">현금흐름과목</div>
+          <div><input type="text" class="erp-input" readonly></div>
+          <div class="erp-label">출납방법</div>
+          <div><select class="erp-select" disabled><option></option></select></div>
+          
+          <!-- Row 2 -->
+          <div class="erp-label">예산활동센터</div>
+          <div><input type="text" class="erp-input" readonly></div>
+          <div class="erp-label">출납예정일</div>
+          <div><input type="text" class="erp-input" value="연도. 월. 일." readonly></div>
+          
+          <!-- Row 3 -->
+          <div class="erp-label">증빙</div>
+          <div><input type="text" class="erp-input" value="지출증빙_개인카드" id="previewProof" style="font-weight: 700; color: var(--blue);"></div>
+        </div>
+      </div>
+      
+      <!-- Right Management Items -->
+      <div class="erp-right-col">
+        <div class="erp-grid-right">
+          <div class="erp-label">1 거래처 [Text]</div>
+          <div><input type="text" class="erp-input" id="previewVendor" style="font-weight: 700; color: var(--blue);"></div>
+          
+          <div class="erp-label">2 사원</div>
+          <div><input type="text" class="erp-input" id="previewName" style="font-weight: 700; color: var(--blue);"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  
   <div style="margin-top:16px; text-align:left; font-size:12.5px; color:var(--ink-2); line-height:1.5; padding: 0 4px; margin-bottom: 24px;">
     ⚠️ <strong style="color:var(--ink);">안내</strong>: 영수증 원본 이미지는 <strong style="color:var(--ink);">해당 월 종료 60일 이후 자동 삭제</strong>됩니다. 증빙 자료 보관이 필요하신 경우 반드시 사전에 엑셀 및 영수증 다운로드 기능을 통해 백업해 주세요.
   </div>
@@ -529,6 +661,13 @@
       <div class="modal-body" style="padding: 20px 22px;">
         <form id="authForm">
           <div class="form-grid">
+            <div class="field c12" id="authNameContainer" style="display: none; margin-bottom: 14px;">
+              <label>이름 (사원명) <span style="font-size: 12px; color: var(--ink-2); font-weight: normal; margin-left: 6px;">(선택)</span></label>
+              <input type="text" id="authName" placeholder="예: 홍길동">
+              <div style="font-size: 12px; color: var(--blue); margin-top: 6px; line-height: 1.4; padding: 6px 10px; background: #f0f6ff; border-radius: 4px;">
+                💡 <b>TIP</b>: 이름을 입력해두시면 나중에 전표 입력 시 '사원' 칸이 자동으로 채워져 아주 편리합니다.
+              </div>
+            </div>
             <div class="field c12">
               <label>이메일 주소 <span class="req">*</span></label>
               <input type="email" id="authEmail" placeholder="example@email.com" autocomplete="email">
@@ -630,6 +769,17 @@
       <p style="margin-bottom:24px; font-size:14px; color:var(--ink-2); line-height:1.5;">
         로그인 계정: <strong id="accountEmailText" style="color:var(--ink);"></strong>
       </p>
+      <div class="form-grid" style="margin-bottom: 24px;">
+        <div class="field c12" style="margin-bottom: 10px;">
+          <label>이름 (사원명) <span style="font-size: 12px; color: var(--ink-2); font-weight: normal; margin-left: 6px;">(선택)</span></label>
+          <input type="text" id="profileName" placeholder="예: 홍길동">
+        </div>
+        <div class="field c12" style="margin-bottom: 10px;">
+          <label>소속 팀 (귀속부서)</label>
+          <input type="text" id="profileTeam" placeholder="예: 브랜드전략디자인팀">
+        </div>
+        <button class="btn btn-primary" id="profileUpdateBtn" style="width:100%; height:44px; grid-column: span 12;">정보 수정</button>
+      </div>
       <div style="display:flex; flex-direction:column; gap:10px;">
         <button class="btn btn-primary" id="modalLogoutBtn" style="width:100%; height:44px;">로그아웃</button>
         <button class="btn btn-ghost" onclick="document.getElementById('accountOverlay').classList.remove('open')" style="width:100%; height:44px; background:var(--surface-2); color:var(--ink); border:none;">닫기</button>
@@ -828,53 +978,93 @@ function filtered(){
 
 function renderList(){
   const rows=filtered();
-  const tbody=document.getElementById('tbody');
-  const tfoot=document.getElementById('tfoot');
-  const empty=document.getElementById('emptyState');
   const y=viewDate.getFullYear(),m=viewDate.getMonth()+1;
   const label=`${y}년 ${m}월 전체`;
-  document.getElementById('listTitle').textContent=label;
   document.getElementById('downloadZipBtn').textContent=`${m}월 영수증 다운로드`;
-  document.getElementById('listCount').textContent=`${rows.length}건`;
-
-  if(rows.length===0){
-    tbody.innerHTML='';tfoot.innerHTML='';
-    empty.style.display='block';
-    return;
-  }
-  empty.style.display='none';
-  tbody.innerHTML=rows.map((e,i)=>{
-    const dArr = e.date.split('-');
-    const memoStr = `${dArr[0].slice(2)}.${dArr[1]}.${dArr[2]} ${e.memo||''}`.trim();
-    return `
-    <tr class="row">
-      <td class="muted">${pad(i+1)}</td>
-      <td style="white-space:normal">${e.account}</td>
-      <td class="r debit">${e.debit?won(e.debit):'<span class="muted">0</span>'}</td>
-      <td class="r credit">${e.credit?won(e.credit):'<span class="muted">0</span>'}</td>
-      <td style="white-space:normal" class="muted">${memoStr}</td>
-      <td class="muted">${e.vendor||'<span style="color:var(--ink-3)">—</span>'}</td>
-      <td><div class="row-act">
-        <button class="icon-btn" data-edit="${e.id}" title="수정">✎</button>
-        <button class="icon-btn del" data-del="${e.id}" title="삭제">✕</button>
-      </div></td>
-    </tr>`;
-  }).join('');
 
   const td=rows.reduce((s,e)=>s+Number(e.debit||0),0);
-  tfoot.innerHTML=`<tr>
-    <td class="muted">합계</td>
-    <td class="lbl">미지급금-(직원경비)</td>
-    <td class="r muted"></td>
-    <td class="r" style="color:var(--credit)">${won(td)}</td>
-    <td colspan="3"></td>
-  </tr>`;
 
-  tbody.querySelectorAll('[data-del]').forEach(b=>b.onclick=(ev)=>{
-    const id=ev.currentTarget.dataset.del;
-    askDelete(id);
+  // === ERP 뷰 ===
+  const tbodyErp=document.getElementById('tbodyErp');
+  const tfootErp=document.getElementById('tfootErp');
+  const emptyErp=document.getElementById('emptyStateErp');
+  document.getElementById('listTitleErp').textContent=`분개전표입력 (${label})`;
+  document.getElementById('listCountErp').textContent=`${rows.length}건`;
+  
+  const lastDay = new Date(y, viewDate.getMonth() + 1, 0).getDate();
+  document.getElementById('erpAccountingDate').textContent = `${y}.${String(m).padStart(2, '0')}.${String(lastDay).padStart(2, '0')}`;
+
+  if(rows.length===0){
+    tbodyErp.innerHTML=''; tfootErp.innerHTML=''; emptyErp.style.display='block';
+  } else {
+    emptyErp.style.display='none';
+    tbodyErp.innerHTML=rows.map((e,i)=>{
+      const dArr = e.date.split('-');
+      const memoStr = `${dArr[0].slice(2)}.${dArr[1]}.${dArr[2]} ${e.memo||''}`.trim();
+      return `
+      <tr class="row erp-row" data-id="${e.id}" style="cursor: pointer;">
+        <td class="muted">${String(i+1).padStart(4, '0')}</td>
+        <td style="white-space:normal">${e.account}</td>
+        <td class="muted"></td>
+        <td class="r debit">${e.debit?won(e.debit):'<span class="muted">0</span>'}</td>
+        <td class="r credit">${e.credit?won(e.credit):'<span class="muted">0</span>'}</td>
+        <td style="white-space:normal" class="muted">${memoStr}</td>
+        <td class="sticky-col" style="vertical-align: middle;"><div class="row-act" style="justify-content: center; width: 100%;">
+          <button class="icon-btn" data-edit="${e.id}" title="수정" onclick="event.stopPropagation();">✎</button>
+          <button class="icon-btn del" data-del="${e.id}" title="삭제" onclick="event.stopPropagation();">✕</button>
+        </div></td>
+      </tr>`;
+    }).join('');
+    tfootErp.innerHTML=`<tr class="erp-total-row" style="cursor:pointer;">
+      <td class="muted">합계</td>
+      <td class="lbl">미지급금-(직원경비)</td>
+      <td></td>
+      <td class="r muted"></td>
+      <td class="r" style="color:var(--credit)">${won(td)}</td>
+      <td></td>
+      <td class="sticky-col"></td>
+    </tr>`;
+
+    const totalRow = tfootErp.querySelector('.erp-total-row');
+    
+    tbodyErp.querySelectorAll('.erp-row').forEach(row => {
+      row.onclick = () => {
+        tbodyErp.querySelectorAll('.erp-row').forEach(r => r.style.background = '');
+        if(totalRow) totalRow.style.background = '';
+        row.style.background = 'var(--blue-soft)';
+        const id = row.dataset.id;
+        const e = entries.find(x => String(x.id) === String(id));
+        if (e) {
+          document.getElementById('previewVendor').value = e.vendor || '';
+          document.getElementById('previewName').value = localStorage.getItem('expense_user_name') || '임직원';
+          const pf = document.getElementById('previewProof');
+          if(pf) pf.value = '지출증빙_개인카드';
+        }
+      };
+    });
+
+    if(totalRow) {
+      totalRow.onclick = () => {
+        tbodyErp.querySelectorAll('.erp-row').forEach(r => r.style.background = '');
+        totalRow.style.background = 'var(--blue-soft)';
+        
+        // 미지급금 클릭 시 하단 박스 항목 변경
+        const userName = localStorage.getItem('expense_user_name') || '임직원';
+        document.getElementById('previewVendor').value = '본사 여의도';
+        document.getElementById('previewName').value = userName;
+        const pf = document.getElementById('previewProof');
+        if(pf) pf.value = ''; // 증빙 없음
+      };
+    }
+  }
+
+
+
+  // Bind edit/delete for all lists
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=(ev)=>{
+    askDelete(ev.currentTarget.dataset.del);
   });
-  tbody.querySelectorAll('[data-edit]').forEach(b=>b.onclick=(ev)=>{
+  document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=(ev)=>{
     startEdit(ev.currentTarget.dataset.edit);
   });
 }
@@ -1060,6 +1250,8 @@ async function submitEntry(){
     debit,credit:0,
     memo,
     vendor:document.getElementById('fVendor').value.trim(),
+    department: localStorage.getItem('expense_user_team') || '',
+    employeeName: localStorage.getItem('expense_user_name') || '',
   };
 
   flashSave('저장 중…');
@@ -1145,16 +1337,7 @@ document.getElementById('addContinueBtn').onclick=async()=>{
 };
 document.getElementById('closeModal').onclick=closeModal;
 
-/* 내보내기 드롭다운 토글 */
-(function(){
-  const menu=document.getElementById('exportMenu');
-  const btn=document.getElementById('exportMenuBtn');
-  const dd=document.getElementById('exportDropdown');
-  const close=()=>{dd.classList.remove('open');btn.setAttribute('aria-expanded','false');};
-  btn.onclick=(e)=>{e.stopPropagation();const open=dd.classList.toggle('open');btn.setAttribute('aria-expanded',open?'true':'false');};
-  dd.addEventListener('click',close); // 항목 선택 시 닫기
-  document.addEventListener('click',(e)=>{if(!menu.contains(e.target))close();});
-})();
+/* 내보내기 단일 버튼 (드롭다운 삭제됨) */
 document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeModal();});
 document.getElementById('overlay').addEventListener('keydown',e=>{
   if(e.key==='Enter'){e.preventDefault();document.getElementById('addBtn').click();}
@@ -1623,7 +1806,9 @@ async function fillFromReceipt(files){
           debit: r.amount || 0,
           credit: 0,
           memo: r.memo || '',
-          vendor: r.vendor || ''
+          vendor: r.vendor || '',
+          department: localStorage.getItem('expense_user_team') || '',
+          employeeName: localStorage.getItem('expense_user_name') || ''
         };
         
         if (isLoggedIn()) {
@@ -1677,7 +1862,46 @@ document.getElementById('prevBtn').onclick=()=>{viewDate.setMonth(viewDate.getMo
 document.getElementById('nextBtn').onclick=()=>{viewDate.setMonth(viewDate.getMonth()+1);renderCalendar();};
 document.getElementById('todayBtn').onclick=()=>{viewDate=new Date();renderAll();};
 
+/* ---- View Tabs Toggle ---- */
+let isCalOpen = false;
+document.getElementById('btnToggleCal').onclick = () => {
+  isCalOpen = !isCalOpen;
+  const calContainer = document.getElementById('calContainer');
+  const btnToggleCal = document.getElementById('btnToggleCal');
+  if (isCalOpen) {
+    calContainer.style.display = 'block';
+    btnToggleCal.textContent = '📅 달력 접기 ▲';
+    btnToggleCal.className = 'btn btn-primary';
+    btnToggleCal.style.border = 'none';
+    btnToggleCal.style.background = ''; // Clear inline background so css works
+    btnToggleCal.style.color = '#fff';
+    renderCalendar();
+  } else {
+    calContainer.style.display = 'none';
+    btnToggleCal.textContent = '📅 달력 펼치기 ▼';
+    btnToggleCal.className = 'btn btn-ghost';
+    btnToggleCal.style.border = 'none';
+    btnToggleCal.style.background = 'transparent';
+    btnToggleCal.style.color = 'var(--ink-2)';
+  }
+};
+
 /* ---- export & download ---- */
+const exportMenuBtn = document.getElementById('exportMenuBtn');
+const exportDropdown = document.getElementById('exportDropdown');
+if (exportMenuBtn) {
+  exportMenuBtn.onclick = (e) => {
+    e.stopPropagation();
+    exportDropdown.classList.toggle('open');
+    const isOpen = exportDropdown.classList.contains('open');
+    exportMenuBtn.setAttribute('aria-expanded', isOpen);
+  };
+  document.addEventListener('click', () => {
+    exportDropdown.classList.remove('open');
+    exportMenuBtn.setAttribute('aria-expanded', 'false');
+  });
+}
+
 document.getElementById('downloadZipBtn').onclick=async()=>{
   const rows=filtered();
   if(rows.length===0){alert('다운로드할 전표가 없습니다.');return;}
@@ -1718,7 +1942,9 @@ document.getElementById('downloadZipBtn').onclick=async()=>{
 };
 
 document.getElementById('exportBtn').onclick=()=>{
-  const label = document.getElementById('listTitle').textContent.replace(' 전체', '');
+  const y = viewDate.getFullYear();
+  const m = viewDate.getMonth() + 1;
+  const label = `${y}년 ${m}월`;
   document.getElementById('exportMonthLabel').textContent = label;
   document.getElementById('exportModalOverlay').classList.add('open');
 };
@@ -1752,14 +1978,14 @@ function performExport(range) {
   
   months.forEach(ms => {
     const rows = exportData[ms].sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
-    const aoa=[['행번호','계정과목','비용구분','차변금액','대변금액','적요','사용처']];
+    const aoa=[['행번호','계정과목','비용구분','차변금액','대변금액','적요','귀속부서','활동센터']];
     rows.forEach((e, i)=>{
       const dArr = e.date.split('-');
       const memoStr = `${dArr[0].slice(2)}.${dArr[1]}.${dArr[2]} ${e.memo||''}`.trim();
-      aoa.push([String(i+1).padStart(4, '0'), e.account, '', e.debit, e.credit, memoStr, e.vendor||'']);
+      aoa.push([String(i+1).padStart(4, '0'), e.account, '', e.debit, e.credit, memoStr, e.department||'', e.department||'']);
     });
     const td=rows.reduce((s,e)=>s+Number(e.debit||0),0);
-    aoa.push(['합계','미지급금-(직원경비)','','',td,'','']);
+    aoa.push(['합계','미지급금-(직원경비)','','',td,'','','']);
     const ws=XLSX.utils.aoa_to_sheet(aoa);
     ws['!cols']=[{wch:10},{wch:26},{wch:10},{wch:12},{wch:12},{wch:34},{wch:16}];
     XLSX.utils.book_append_sheet(wb, ws, ms);
@@ -1788,6 +2014,7 @@ function resetAuthForm() {
   document.getElementById('tabLoginBtn').classList.add('active');
   document.getElementById('tabRegisterBtn').classList.remove('active');
   document.getElementById('authConfirmContainer').style.display = 'none';
+  document.getElementById('authNameContainer').style.display = 'none';
   document.getElementById('authSubmitBtn').textContent = '로그인';
   document.getElementById('authEmail').value = '';
   document.getElementById('authPassword').value = '';
@@ -1801,6 +2028,10 @@ function clearAuthErrors() {
   document.getElementById('authEmailErr').closest('.field').classList.remove('invalid');
   document.getElementById('authPasswordErr').closest('.field').classList.remove('invalid');
   document.getElementById('authPasswordConfirmErr').closest('.field').classList.remove('invalid');
+  
+  const nameErr = document.getElementById('authNameErr');
+  if (nameErr) nameErr.closest('.field').classList.remove('invalid');
+  
 }
 
 // 로그인/회원가입 화면(auth)과 비밀번호 재설정 화면(reset) 전환
@@ -1817,6 +2048,7 @@ document.getElementById('tabLoginBtn').onclick = () => {
   document.getElementById('tabLoginBtn').classList.add('active');
   document.getElementById('tabRegisterBtn').classList.remove('active');
   document.getElementById('authConfirmContainer').style.display = 'none';
+  document.getElementById('authNameContainer').style.display = 'none';
   document.getElementById('authSubmitBtn').textContent = '로그인';
   document.getElementById('forgotPwRow').style.display = 'block';
   clearAuthErrors();
@@ -1826,6 +2058,7 @@ document.getElementById('tabRegisterBtn').onclick = () => {
   document.getElementById('tabRegisterBtn').classList.add('active');
   document.getElementById('tabLoginBtn').classList.remove('active');
   document.getElementById('authConfirmContainer').style.display = 'block';
+  document.getElementById('authNameContainer').style.display = 'block';
   document.getElementById('authSubmitBtn').textContent = '회원가입';
   document.getElementById('forgotPwRow').style.display = 'none';
   clearAuthErrors();
@@ -1843,6 +2076,7 @@ document.getElementById('authForm').onsubmit = async (e) => {
   const email = document.getElementById('authEmail').value.trim();
   const password = document.getElementById('authPassword').value;
   const confirmPassword = document.getElementById('authPasswordConfirm').value;
+  const name = document.getElementById('authName').value.trim();
   
   let hasErr = false;
   if (!email || !email.includes('@')) {
@@ -1861,6 +2095,7 @@ document.getElementById('authForm').onsubmit = async (e) => {
     document.getElementById('authPasswordConfirmErr').closest('.field').classList.add('invalid');
     hasErr = true;
   }
+  // Name is now optional
   if (hasErr) return;
   
   const msgEl = document.getElementById('authMessage');
@@ -1877,7 +2112,7 @@ document.getElementById('authForm').onsubmit = async (e) => {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password, name, team })
       });
       const data = await res.json();
       if (res.ok) {
@@ -1904,6 +2139,8 @@ document.getElementById('authForm').onsubmit = async (e) => {
         
         localStorage.setItem('expense_user_token', data.token);
         localStorage.setItem('expense_user_email', data.email);
+        localStorage.setItem('expense_user_name', data.name || '');
+        localStorage.setItem('expense_user_team', data.team || '');
         
         setTimeout(async () => {
           closeAuthModal();
@@ -2129,7 +2366,36 @@ function updateAuthUI() {
     
     document.getElementById('accountBtn').onclick = () => {
       document.getElementById('accountEmailText').textContent = email;
+      document.getElementById('profileName').value = localStorage.getItem('expense_user_name') || '';
+      
       document.getElementById('accountOverlay').classList.add('open');
+    };
+    
+    document.getElementById('profileUpdateBtn').onclick = async () => {
+      const name = document.getElementById('profileName').value.trim();
+      const team = "";
+      const btn = document.getElementById('profileUpdateBtn');
+      setLoading(btn, true, '정보 수정');
+      try {
+        const res = await fetch('/api/auth/profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...getHeaders() },
+          body: JSON.stringify({ name, team })
+        });
+        const data = await res.json();
+        if(res.ok) {
+          localStorage.setItem('expense_user_token', data.token);
+          localStorage.setItem('expense_user_name', data.name);
+          localStorage.setItem('expense_user_team', data.team);
+          alert('프로필이 업데이트되었습니다.');
+        } else {
+          alert(data.error || '업데이트 실패');
+        }
+      } catch(e) {
+        alert('서버 오류');
+      } finally {
+        setLoading(btn, false, '정보 수정');
+      }
     };
 
     document.getElementById('modalLogoutBtn').onclick = () => {

@@ -36,9 +36,16 @@ async function initDb() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
+      name TEXT,
+      team TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  try { await db.execute("ALTER TABLE users ADD COLUMN name TEXT"); } catch(e) {}
+  try { await db.execute("ALTER TABLE users ADD COLUMN team TEXT"); } catch(e) {}
+  try { await db.execute("ALTER TABLE expenses ADD COLUMN department TEXT"); } catch(e) {}
+  try { await db.execute("ALTER TABLE expenses ADD COLUMN employeeName TEXT"); } catch(e) {}
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS expenses (
@@ -169,7 +176,7 @@ function authenticateToken(req, res, next) {
 
 // 회원가입
 app.post('/api/auth/register', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, name, team } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: '이메일과 비밀번호를 입력해주세요.' });
   }
@@ -181,8 +188,8 @@ app.post('/api/auth/register', async (req, res) => {
   try {
     const passwordHash = await bcrypt.hash(password, 10);
     await db.execute({
-      sql: 'INSERT INTO users (email, password_hash) VALUES (?, ?)',
-      args: [email, passwordHash]
+      sql: 'INSERT INTO users (email, password_hash, name, team) VALUES (?, ?, ?, ?)',
+      args: [email, passwordHash, name || '', team || '']
     });
     res.status(201).json({ message: '회원가입이 완료되었습니다.' });
   } catch (err) {
@@ -217,8 +224,8 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: '이메일 또는 비밀번호가 잘못되었습니다.' });
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
-    res.json({ token, email: user.email });
+    const token = jwt.sign({ id: user.id, email: user.email, name: user.name, team: user.team }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, email: user.email, name: user.name, team: user.team });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: '로그인 중 오류가 발생했습니다.' });
@@ -343,13 +350,29 @@ app.delete('/api/auth/me', authenticateToken, async (req, res) => {
   }
 });
 
+// 프로필 수정
+app.put('/api/auth/profile', authenticateToken, async (req, res) => {
+  const { name, team } = req.body;
+  try {
+    await db.execute({
+      sql: 'UPDATE users SET name = ?, team = ? WHERE id = ?',
+      args: [name || '', team || '', req.user.id]
+    });
+    const token = jwt.sign({ id: req.user.id, email: req.user.email, name: name || '', team: team || '' }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, name: name || '', team: team || '' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '프로필 수정 중 오류가 발생했습니다.' });
+  }
+});
+
 // --- 지출 데이터 API ---
 
 // 지출 내역 전체 조회
 app.get('/api/expenses', authenticateToken, async (req, res) => {
   try {
     const result = await db.execute({
-      sql: 'SELECT id, date, account, debit, credit, memo, vendor FROM expenses WHERE user_id = ? ORDER BY date ASC, id ASC',
+      sql: 'SELECT id, date, account, debit, credit, memo, vendor, department, employeeName FROM expenses WHERE user_id = ? ORDER BY date ASC, id ASC',
       args: [req.user.id]
     });
     const list = result.rows.map(row => ({
@@ -359,7 +382,9 @@ app.get('/api/expenses', authenticateToken, async (req, res) => {
       debit: Number(row.debit || 0),
       credit: Number(row.credit || 0),
       memo: row.memo || '',
-      vendor: row.vendor || ''
+      vendor: row.vendor || '',
+      department: row.department || '',
+      employeeName: row.employeeName || ''
     }));
     res.json(list);
   } catch (err) {
@@ -370,18 +395,18 @@ app.get('/api/expenses', authenticateToken, async (req, res) => {
 
 // 지출 내역 추가
 app.post('/api/expenses', authenticateToken, async (req, res) => {
-  const { date, account, debit, credit, memo, vendor } = req.body;
+  const { date, account, debit, credit, memo, vendor, department, employeeName } = req.body;
   if (!date || !account || memo === undefined) {
     return res.status(400).json({ error: '필수 항목이 누락되었습니다.' });
   }
 
   try {
     const result = await db.execute({
-      sql: 'INSERT INTO expenses (user_id, date, account, debit, credit, memo, vendor) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      args: [req.user.id, date, account, debit || 0, credit || 0, memo, vendor || '']
+      sql: 'INSERT INTO expenses (user_id, date, account, debit, credit, memo, vendor, department, employeeName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      args: [req.user.id, date, account, debit || 0, credit || 0, memo, vendor || '', department || '', employeeName || '']
     });
     const newId = Number(result.lastInsertRowid);
-    res.status(201).json({ id: newId, date, account, debit, credit, memo, vendor });
+    res.status(201).json({ id: newId, date, account, debit, credit, memo, vendor, department, employeeName });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: '추가 중 오류가 발생했습니다.' });
@@ -391,7 +416,7 @@ app.post('/api/expenses', authenticateToken, async (req, res) => {
 // 지출 내역 수정
 app.put('/api/expenses/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { date, account, debit, credit, memo, vendor } = req.body;
+  const { date, account, debit, credit, memo, vendor, department, employeeName } = req.body;
 
   try {
     const check = await db.execute({
@@ -403,10 +428,10 @@ app.put('/api/expenses/:id', authenticateToken, async (req, res) => {
     }
 
     await db.execute({
-      sql: 'UPDATE expenses SET date = ?, account = ?, debit = ?, credit = ?, memo = ?, vendor = ? WHERE id = ? AND user_id = ?',
-      args: [date, account, debit || 0, credit || 0, memo, vendor || '', id, req.user.id]
+      sql: 'UPDATE expenses SET date = ?, account = ?, debit = ?, credit = ?, memo = ?, vendor = ?, department = ?, employeeName = ? WHERE id = ? AND user_id = ?',
+      args: [date, account, debit || 0, credit || 0, memo, vendor || '', department || '', employeeName || '', id, req.user.id]
     });
-    res.json({ id: Number(id), date, account, debit, credit, memo, vendor });
+    res.json({ id: Number(id), date, account, debit, credit, memo, vendor, department, employeeName });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: '수정 중 오류가 발생했습니다.' });
@@ -443,7 +468,7 @@ app.post('/api/expenses/sync', authenticateToken, async (req, res) => {
     const syncedItems = [];
     for (const exp of expenses) {
       const result = await db.execute({
-        sql: 'INSERT INTO expenses (user_id, date, account, debit, credit, memo, vendor) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        sql: 'INSERT INTO expenses (user_id, date, account, debit, credit, memo, vendor, department, employeeName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         args: [
           req.user.id,
           exp.date,
@@ -451,7 +476,9 @@ app.post('/api/expenses/sync', authenticateToken, async (req, res) => {
           exp.debit || 0,
           exp.credit || 0,
           exp.memo || '',
-          exp.vendor || ''
+          exp.vendor || '',
+          exp.department || '',
+          exp.employeeName || ''
         ]
       });
       const newId = Number(result.lastInsertRowid);
@@ -462,7 +489,9 @@ app.post('/api/expenses/sync', authenticateToken, async (req, res) => {
         debit: exp.debit || 0,
         credit: exp.credit || 0,
         memo: exp.memo || '',
-        vendor: exp.vendor || ''
+        vendor: exp.vendor || '',
+        department: exp.department || '',
+        employeeName: exp.employeeName || ''
       });
       
       if (exp.dataUrl) {
