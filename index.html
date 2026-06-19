@@ -1251,13 +1251,27 @@ function parseReceipt(text){
     }
   }
 
-  // ---- 계정과목 추정 및 적요(메모) 힌트 자동 생성 ----
+  // ---- 계정과목 추정 및 적요(메모) 자동 생성 ----
+  // 사용처 키워드에 따라 적요를 고정값으로 자동 입력한다.
+  //   숙박류(호텔/모텔/숙박 등)        → "출장 숙박비"
+  //   한국철도공사/코레일/KTX 등       → "기차비"
+  //   카카오T/티머니/택시/운수 등      → "택시비"
   const fullText = text.replace(/\s+/g, '').toLowerCase();
-  let categoryKeyword = '';
+  let categoryKeyword = '';   // 사용처와 합쳐 쓰는 적요 키워드 (예: "○○ 식대")
+  let memoOverride = '';      // 사용처 키워드 기반 고정 적요
   if(/모텔|호텔|motel|hotel|숙박|여관|리조트|콘도|펜션|여행/.test(fullText)) {
     result.account = '(판)여비교통비-(국내출장비)';
     categoryKeyword = '숙박비';
-  } else if(/택시|taxi|카카오티|티머니|tmoney|운수|교통|버스|지하철|철도|ktx|srt|코레일|주유|충전/.test(fullText)) {
+    memoOverride = '출장 숙박비';
+  } else if(/한국철도공사|코레일|korail|ktx|srt|철도|기차/.test(fullText)) {
+    result.account = '(판)여비교통비-(시내교통비)';
+    categoryKeyword = '기차비';
+    memoOverride = '기차비';
+  } else if(/택시|taxi|카카오티|카카오t|카카오모빌리티|티머니|tmoney|운수|진모빌리티|우티|uti|타다|tada/.test(fullText)) {
+    result.account = '(판)여비교통비-(시내교통비)';
+    categoryKeyword = '택시비';
+    memoOverride = '택시비';
+  } else if(/버스|지하철|교통|주유|충전/.test(fullText)) {
     result.account = '(판)여비교통비-(시내교통비)';
     categoryKeyword = '교통비';
   } else if(/식당|음식|구내식당|커피|카페|coffee|cafe|베이커리|레스토랑|한식|중식|일식|분식|치킨|피자|식비|외식/.test(fullText)) {
@@ -1272,13 +1286,14 @@ function parseReceipt(text){
     if (categoryKeyword === '숙박비' && result.vendor.includes('모델')) {
       result.vendor = result.vendor.replace('모델', '모텔');
     }
-    
-    // 적요 자동 완성 (예: 영월 출장 택시비 -> 테마모텔 숙박비)
-    if (categoryKeyword) {
-      result.memo = `${result.vendor} ${categoryKeyword}`;
-    } else {
-      result.memo = `${result.vendor} 결제`;
-    }
+  }
+
+  // 적요 자동 완성: 고정 적요(memoOverride)가 있으면 우선 적용,
+  // 없으면 "사용처 + 키워드" 형식으로 생성 (예: 테마모텔 숙박비)
+  if (memoOverride) {
+    result.memo = memoOverride;
+  } else if (result.vendor) {
+    result.memo = categoryKeyword ? `${result.vendor} ${categoryKeyword}` : `${result.vendor} 결제`;
   }
 
   // ---- 택시 결제는 사용처를 '택시'로 통일 ----
