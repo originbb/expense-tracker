@@ -1737,16 +1737,16 @@ function performExport(range) {
   
   months.forEach(ms => {
     const rows = exportData[ms].sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
-    const aoa=[['행번호','계정과목','차변금액','대변금액','적요','사용처']];
+    const aoa=[['행번호','계정과목','비용구분','차변금액','대변금액','적요','사용처']];
     rows.forEach((e, i)=>{
       const dArr = e.date.split('-');
       const memoStr = `${dArr[0].slice(2)}.${dArr[1]}.${dArr[2]} ${e.memo||''}`.trim();
-      aoa.push([String(i+1).padStart(4, '0'), e.account, e.debit, e.credit, memoStr, e.vendor||'']);
+      aoa.push([String(i+1).padStart(4, '0'), e.account, '', e.debit, e.credit, memoStr, e.vendor||'']);
     });
     const td=rows.reduce((s,e)=>s+Number(e.debit||0),0);
-    aoa.push(['합계','미지급금-(직원경비)','',td,'','']);
+    aoa.push(['합계','미지급금-(직원경비)','','',td,'','']);
     const ws=XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols']=[{wch:10},{wch:26},{wch:12},{wch:12},{wch:34},{wch:16}];
+    ws['!cols']=[{wch:10},{wch:26},{wch:10},{wch:12},{wch:12},{wch:34},{wch:16}];
     XLSX.utils.book_append_sheet(wb, ws, ms);
   });
 
