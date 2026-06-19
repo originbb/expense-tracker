@@ -61,7 +61,21 @@
     background-image:radial-gradient(60% 50% at 12% -5%, var(--glow-1), transparent 70%), radial-gradient(50% 45% at 105% 8%, var(--glow-2), transparent 70%);
     background-attachment:fixed;
     transition:background-color .35s var(--ease), color .35s var(--ease);}
-  .wrap{max-width:1120px;margin:0 auto;padding:28px 20px 80px;}
+  .wrap{max-width:1340px;margin:0 auto;padding:28px 20px 80px;}
+
+  .split-layout { display: flex; gap: 24px; align-items: stretch; }
+  .left-pane { flex: 1; min-width: 0; }
+  .right-pane { width: 440px; flex-shrink: 0; }
+  .right-pane-inner { position: sticky; top: 24px; height: 100%; max-height: calc(100vh - 48px); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: 0 4px 12px rgba(0,0,0,0.05); display: flex; flex-direction: column; overflow: hidden; }
+  .receipt-viewer-header { padding: 16px; border-bottom: 1px solid var(--line); font-weight: 600; color: var(--ink); background: var(--surface-2); display: flex; justify-content: space-between; align-items: center; }
+  .receipt-viewer-content { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; background: var(--line-2); padding: 16px; overflow: auto; position: relative; }
+  .receipt-viewer-content img { max-width: 100%; height: auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: var(--radius); margin: auto 0; }
+  .receipt-placeholder { color: var(--ink-3); font-size: 14px; text-align: center; margin: auto 0; }
+
+  @media (max-width: 1024px) {
+    .split-layout { flex-direction: column; }
+    .right-pane { width: 100%; position: relative; top: 0; height: 500px; max-height: 60vh; }
+  }
   @keyframes riseIn{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:none;}}
   .wrap > *{animation:riseIn .55s var(--ease) both;}
   .wrap > *:nth-child(1){animation-delay:.03s;}
@@ -140,9 +154,9 @@
   .list-card{overflow:hidden;}
   .list-head{display:flex;align-items:baseline;justify-content:space-between;padding:18px 22px 14px;border-bottom:1px solid var(--line);}
   .list-head h2{font-size:16px;font-weight:700;letter-spacing:-.01em;}
-  .list-head .count{font-size:12px;color:var(--ink-3);font-weight:500;margin-left:8px;}
+  .list-head .count{font-size:13px;color:var(--ink-3);font-weight:600;display:block;margin-top:4px;margin-left:0;}
   .table-scroll{overflow-x:auto;}
-  table{width:100%;border-collapse:collapse;min-width:860px;table-layout:fixed;}
+  table{width:100%;border-collapse:collapse;min-width:780px;table-layout:fixed;}
   th{font-size:13px;font-weight:600;color:var(--ink);text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap;letter-spacing:.02em;background:var(--surface-2);}
   th.r,td.r{text-align:right;}
   td{font-size:13px;padding:11px 12px;border-bottom:1px solid var(--line);color:var(--ink);vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -361,24 +375,26 @@
 
   /* ERP Form Layout */
   #erpPreviewPanel { overflow-x: auto; }
-  .erp-preview-wrap { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
-  .erp-left-col { flex: 1 1 500px; min-width: 280px; }
-  .erp-right-col { flex: 1 1 250px; min-width: 180px; display: flex; flex-direction: column; }
+  .erp-preview-wrap { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; min-width: max-content; }
+  .erp-left-col { flex: 1; padding-right: 20px; margin-right: 20px; border-right: 1px solid var(--line-2); }
+  .erp-right-col { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; }
   
   .erp-grid { 
     display: grid; 
-    grid-template-columns: 90px 1.5fr 80px 1fr; 
+    grid-template-columns: 80px 1fr 72px 100px; 
     row-gap: 10px; 
     column-gap: 12px; 
     align-items: center; 
   }
   .erp-grid-right {
     display: grid; 
-    grid-template-columns: 110px 160px; 
+    grid-template-columns: 45px 1fr; 
     row-gap: 10px; 
     column-gap: 12px; 
     align-items: center;
   }
+
+
   .erp-label {
     font-size: 12px;
     font-weight: 500;
@@ -455,7 +471,11 @@
     </div>
   </header>
 
-
+  <!-- 분할 레이아웃 컨테이너 시작 -->
+  <div class="split-layout">
+    
+    <!-- 좌측: 기존 데이터 및 입력 영역 -->
+    <div class="left-pane">
 
   <div style="margin: 0 0 24px;">
     <button type="button" class="btn" id="receiptBtn" style="width:100%;height:58px;background:var(--blue);color:#fff;border-radius:var(--radius-lg);font-size:16px;font-weight:600;letter-spacing:-.01em;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 8px 28px var(--blue-soft);">
@@ -514,12 +534,11 @@
       </div>
     </div>
     <div class="table-scroll">
-      <table style="min-width: 900px;">
+      <table>
         <thead>
           <tr>
             <th style="width:60px">행번호</th>
             <th style="width:180px">계정과목</th>
-            <th style="width:80px">비용구분</th>
             <th class="r" style="width:100px">차변금액</th>
             <th class="r" style="width:100px">대변금액</th>
             <th style="width:250px">적요</th>
@@ -538,7 +557,7 @@
   </section>
 
   <!-- ERP Bottom Preview Panel -->
-  <div class="card" id="erpPreviewPanel" style="padding: 20px; margin-bottom: 16px; min-height: 140px;">
+  <div class="card" id="erpPreviewPanel" style="padding: 20px; margin-bottom: 0; min-height: 140px;">
     <div class="erp-preview-wrap">
       <!-- Left Form -->
       <div class="erp-left-col">
@@ -557,17 +576,17 @@
           
           <!-- Row 3 -->
           <div class="erp-label">증빙</div>
-          <div><input type="text" class="erp-input" value="지출증빙_개인카드" id="previewProof" style="font-weight: 700; color: var(--blue);"></div>
+          <div style="grid-column: 2 / -1;"><input type="text" class="erp-input" value="지출증빙_개인카드" id="previewProof" style="font-weight: 700; color: var(--blue);"></div>
         </div>
       </div>
       
       <!-- Right Management Items -->
       <div class="erp-right-col">
         <div class="erp-grid-right">
-          <div class="erp-label">1 거래처 [Text]</div>
+          <div class="erp-label">거래처</div>
           <div><input type="text" class="erp-input" id="previewVendor" style="font-weight: 700; color: var(--blue);"></div>
           
-          <div class="erp-label">2 사원</div>
+          <div class="erp-label">사원</div>
           <div><input type="text" class="erp-input" id="previewName" style="font-weight: 700; color: var(--blue);"></div>
         </div>
       </div>
@@ -575,9 +594,28 @@
   </div>
 
   
-  <div style="margin-top:16px; text-align:left; font-size:12.5px; color:var(--ink-2); line-height:1.5; padding: 0 4px; margin-bottom: 24px;">
+    </div><!-- /.left-pane -->
+
+    <!-- 우측: 신규 영수증 뷰어 영역 -->
+    <div class="right-pane">
+      <div class="right-pane-inner">
+        <div class="receipt-viewer-header">영수증 원본 뷰어</div>
+        <div class="receipt-viewer-content" id="receiptViewerContent">
+          <!-- 스캔 시 여기에 이미지가 표시됩니다 -->
+          <div class="receipt-placeholder">
+            <div style="font-size: 32px; margin-bottom: 12px;">📄</div>
+            좌측 리스트에서 전표를 선택하거나<br>영수증을 스캔하면 원본이 표시됩니다.
+          </div>
+        </div>
+      </div>
+    </div><!-- /.right-pane -->
+
+  </div><!-- /.split-layout -->
+
+  <div style="margin-top:24px; text-align:left; font-size:12.5px; color:var(--ink-2); line-height:1.5; padding: 0 4px; margin-bottom: 24px;">
     ⚠️ <strong style="color:var(--ink);">안내</strong>: 영수증 원본 이미지는 <strong style="color:var(--ink);">해당 월 종료 60일 이후 자동 삭제</strong>됩니다. 증빙 자료 보관이 필요하신 경우 반드시 사전에 엑셀 및 영수증 다운로드 기능을 통해 백업해 주세요.
   </div>
+
 </div><!-- /.wrap : 모달 오버레이는 body 직속으로 분리해 fixed 위치/stacking 보장 -->
 
   <!-- DAY DETAIL -->
@@ -976,6 +1014,32 @@ function filtered(){
     .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
 }
 
+async function showReceiptInViewer(id) {
+  const viewer = document.getElementById('receiptViewerContent');
+  if (!viewer) return;
+  viewer.innerHTML = '<div class="spinner" style="border-color:var(--blue); border-top-color:transparent;"></div> <span style="color:var(--ink-2);font-size:13px;">이미지 불러오는 중...</span>';
+  try {
+    const dataUrl = await getImage(id);
+    if (dataUrl) {
+      viewer.innerHTML = `<img src="${dataUrl}" alt="영수증 원본">`;
+    } else {
+      viewer.innerHTML = `
+        <div class="receipt-placeholder">
+          <div style="font-size: 32px; margin-bottom: 12px;">📄</div>
+          이 전표에는 저장된 영수증 이미지가 없습니다.
+        </div>
+      `;
+    }
+  } catch(e) {
+    viewer.innerHTML = `
+      <div class="receipt-placeholder">
+        <div style="font-size: 32px; margin-bottom: 12px;">⚠️</div>
+        이미지를 불러오는데 실패했습니다.
+      </div>
+    `;
+  }
+}
+
 function renderList(){
   const rows=filtered();
   const y=viewDate.getFullYear(),m=viewDate.getMonth()+1;
@@ -1005,7 +1069,6 @@ function renderList(){
       <tr class="row erp-row" data-id="${e.id}" style="cursor: pointer;">
         <td class="muted">${String(i+1).padStart(4, '0')}</td>
         <td style="white-space:normal">${e.account}</td>
-        <td class="muted"></td>
         <td class="r debit">${e.debit?won(e.debit):'<span class="muted">0</span>'}</td>
         <td class="r credit">${e.credit?won(e.credit):'<span class="muted">0</span>'}</td>
         <td style="white-space:normal" class="muted">${memoStr}</td>
@@ -1018,7 +1081,6 @@ function renderList(){
     tfootErp.innerHTML=`<tr class="erp-total-row" style="cursor:pointer;">
       <td class="muted">합계</td>
       <td class="lbl">미지급금-(직원경비)</td>
-      <td></td>
       <td class="r muted"></td>
       <td class="r" style="color:var(--credit)">${won(td)}</td>
       <td></td>
@@ -1040,6 +1102,7 @@ function renderList(){
           const pf = document.getElementById('previewProof');
           if(pf) pf.value = '지출증빙_개인카드';
         }
+        showReceiptInViewer(id);
       };
     });
 
@@ -1054,6 +1117,16 @@ function renderList(){
         document.getElementById('previewName').value = userName;
         const pf = document.getElementById('previewProof');
         if(pf) pf.value = ''; // 증빙 없음
+        
+        const viewer = document.getElementById('receiptViewerContent');
+        if (viewer) {
+          viewer.innerHTML = `
+            <div class="receipt-placeholder">
+              <div style="font-size: 32px; margin-bottom: 12px;">📄</div>
+              좌측 리스트에서 전표를 선택하거나<br>영수증을 스캔하면 원본이 표시됩니다.
+            </div>
+          `;
+        }
       };
     }
   }
