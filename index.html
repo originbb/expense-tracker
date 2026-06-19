@@ -1222,6 +1222,8 @@ function parseReceipt(text){
   const vendorKw=/(상\s*호\s*명|상\s*호|가\s*맹\s*점\s*명|가\s*맹\s*점|상\s*점\s*명|매\s*장\s*명|매\s*장|점\s*포\s*명|점\s*포|가\s*게\s*명|판\s*매\s*자)/;
   const labelStop=/(대\s*표|사\s*업\s*자|연\s*락\s*처|주\s*소|등\s*록\s*번\s*호|전\s*화|승\s*인|카\s*드|금\s*액|번\s*호|일\s*시|상\s*품\s*명)/;
   const leadStop=/^(주\s*문|번\s*호|유\s*형|코\s*드|구\s*분|시\s*간|일\s*시|상\s*태|명\s*세)/;
+  // 섹션 헤더 단어: '가맹점 정보' → '정보'처럼 키워드만 남은 경우 사용처로 쓰면 안 됨
+  const sectionHeaderOnly=/^(정보|안내|현황|내역|목록|상세|요약|조회|내용)$/;
   for(let i=0;i<lines.length;i++){
     const l=lines[i];
     if(!vendorKw.test(l))continue;
@@ -1230,9 +1232,11 @@ function parseReceipt(text){
     const stop=after.match(labelStop);
     if(stop)after=after.slice(0,stop.index);
     let v=after.replace(/[:;|*]/g,' ').replace(/\s+/g,' ').trim();
+    // 섹션 헤더 단어('정보' 등)만 남은 경우 → 다음 줄에서 실제 가맹점명 찾기
+    if(sectionHeaderOnly.test(v)) v='';
     if(v.length<2 && i+1<lines.length){
       const nx=lines[i+1]; // 값이 다음 줄에 분리된 경우
-      if(/[가-힣A-Za-z]/.test(nx)&&!labelStop.test(nx)&&!vendorKw.test(nx)&&!/\d{3}/.test(nx))
+      if(/[가-힣A-Za-z]/.test(nx)&&!labelStop.test(nx)&&!vendorKw.test(nx)&&!/\d{3}/.test(nx)&&!sectionHeaderOnly.test(nx.trim()))
         v=nx.replace(/[:;|*]/g,' ').replace(/\s+/g,' ').trim();
     }
     if(v.length>=2 && /[가-힣A-Za-z]/.test(v)){result.vendor=v;break;}
