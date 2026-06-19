@@ -479,7 +479,7 @@
 <div class="wrap">
   <header class="top">
     <div class="title-wrap" style="flex: 1;">
-      <h1>영수증 스캔하면 끝! <span style="display: inline-block;">초간단 전표 정리</span></h1>
+      <h1 onclick="location.reload()" style="cursor:pointer" title="새로고침">영수증 스캔하면 끝! <span style="display: inline-block;">초간단 전표 정리</span></h1>
       <div class="sub">영수증을 찰칵 스캔하면 달력 위에 날짜별로 전표가 자동 등록됩니다. 오늘부터 경비 처리 3초 컷 하세요!</div>
     </div>
     <div style="display: flex; align-items: center; gap: 12px; margin-left: auto; flex-shrink: 0;">
@@ -1926,7 +1926,7 @@ async function fillFromReceipt(files){
         
         const addHint=document.getElementById('addHint');
         addHint.style.color='var(--green)';
-        addHint.textContent='자동 인식 완료 · 내역을 확인해 주세요';
+        addHint.textContent='자동인식 완료';
         setTimeout(()=>addHint.textContent='',3500);
       } else {
         const item = {
