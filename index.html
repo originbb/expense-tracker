@@ -1205,15 +1205,17 @@ function closeConfirm(){
 document.getElementById('confirmCancel').onclick=closeConfirm;
 document.getElementById('confirmDelete').onclick=async()=>{
   if(pendingDeleteId!=null){
+    const confirmBtn = document.getElementById('confirmDelete');
+    setIconBtnLoading(confirmBtn, true);
     flashSave('삭제 중…');
-    if (isLoggedIn()) {
-      try {
+    try {
+      if (isLoggedIn()) {
         const res = await fetch(`/api/expenses/${pendingDeleteId}`, {
           method: 'DELETE',
           headers: getHeaders()
         });
         if (res.ok) {
-          entries=entries.filter(x=>String(x.id)!==String(pendingDeleteId));
+          entries = entries.filter(x => String(x.id) !== String(pendingDeleteId));
           flashSave('삭제됨');
         } else {
           const errData = await res.json();
@@ -1222,24 +1224,23 @@ document.getElementById('confirmDelete').onclick=async()=>{
           closeConfirm();
           return;
         }
-      } catch (err) {
-        console.error(err.message);
-        alert('서버 통신 오류가 발생했습니다.');
-        flashSave('삭제 실패');
-        closeConfirm();
-        return;
+      } else {
+        entries = entries.filter(x => String(x.id) !== String(pendingDeleteId));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+        flashSave('삭제됨');
       }
-    } else {
-      entries=entries.filter(x=>String(x.id)!==String(pendingDeleteId));
-      localStorage.setItem(STORAGE_KEY,JSON.stringify(entries));
-      flashSave('삭제됨');
+      renderAll();
+      deleteImage(pendingDeleteId).catch(e => console.error(e.message));
+      closeConfirm();
+    } catch (err) {
+      console.error(err.message);
+      alert('서버 통신 오류가 발생했습니다.');
+      flashSave('삭제 실패');
+      closeConfirm();
+    } finally {
+      setIconBtnLoading(confirmBtn, false);
     }
-    
-    renderAll();
-    deleteImage(pendingDeleteId).catch(e=>console.error(e.message));
-    if(document.getElementById('dayOverlay').classList.contains('open'))renderDayModal();
   }
-  closeConfirm();
 };
 
 document.getElementById('deleteAllBtn').onclick = async () => {
