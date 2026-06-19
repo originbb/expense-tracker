@@ -558,10 +558,10 @@
         <thead>
           <tr>
             <th style="width:60px">행번호</th>
-            <th style="width:160px">계정과목</th>
+            <th style="width:170px">계정과목</th>
             <th class="r" style="width:100px">차변금액</th>
             <th class="r" style="width:100px">대변금액</th>
-            <th style="width:250px">적요</th>
+            <th style="width:200px">적요</th>
             <th class="sticky-col" style="text-align:center;width:130px;">작업</th>
           </tr>
         </thead>
@@ -1088,7 +1088,7 @@ function renderList(){
       return `
       <tr class="row erp-row" data-id="${e.id}" style="cursor: pointer;">
         <td class="muted">${String(i+1).padStart(4, '0')}</td>
-        <td style="white-space:normal">${e.account}</td>
+        <td>${e.account}</td>
         <td class="r debit">${e.debit?won(e.debit):'<span class="muted">0</span>'}</td>
         <td class="r credit">${e.credit?won(e.credit):'<span class="muted">0</span>'}</td>
         <td style="white-space:normal" class="muted">${memoStr}</td>
