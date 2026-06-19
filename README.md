@@ -24,8 +24,10 @@
   - 메일 발송은 **Brevo HTTP API**(443 포트)를 사용합니다. API 키 미설정 시 인증 코드가 서버 콘솔에 출력되어 개발/테스트가 가능합니다.
 - **🗑 영수증 이미지 자동 파기 (60일 정책)**
   - 기기 용량 관리를 위해 로컬 브라우저 및 서버에 저장된 영수증 이미지는 60일이 경과하면 자동으로 삭제(파기)됩니다.
+- **🗑 전표 데이터 일괄 관리**
+  - 등록된 달의 전표 전체를 한 번에 삭제할 수 있는 일괄 삭제 기능을 지원하여 관리가 편리합니다.
 - **📥 데이터 내보내기**
-  - 등록된 전표 내역을 엑셀(Excel, xlsx) 파일로 월별 혹은 전체 다운로드할 수 있습니다. (비용구분 컬럼 포함)
+  - 깔끔하게 정리된 드롭다운 메뉴를 통해 전표 내역을 엑셀(Excel, xlsx) 파일로 다운로드(월별/전체)할 수 있습니다.
   - 첨부했던 영수증 이미지 원본들을 ZIP 파일로 일괄 압축하여 다운로드할 수 있습니다.
 
 ## 🛠 기술 스택 (Tech Stack)
@@ -93,8 +95,8 @@ npm start
 5. **Apply** 클릭 시 자동으로 서비스가 빌드되고 배포됩니다.
 
 ## 📝 데이터베이스 스키마
-- **users**: `id`, `email`, `password_hash`, `created_at`
-- **expenses**: `id`, `user_id`, `date`, `account`, `debit`, `credit`, `memo`, `vendor`, `created_at`
+- **users**: `id`, `email`, `password_hash`, `name`, `team`, `created_at`
+- **expenses**: `id`, `user_id`, `date`, `account`, `debit`, `credit`, `memo`, `vendor`, `department`, `employeeName`, `created_at`
 - **password_resets**: `email`, `code_hash`, `expires_at`, `attempts` (비밀번호 재설정 인증 코드 관리)
 - (영수증 이미지는 DB 과부하를 막기 위해 클라이언트 단의 IndexedDB를 활용하거나 필요시 Blob Storage 확장이 가능하도록 분리 설계되어 있습니다.)
 
