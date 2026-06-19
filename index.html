@@ -1062,6 +1062,16 @@ function filtered(){
     .sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
 }
 
+function resetReceiptViewer() {
+  const viewer = document.getElementById('receiptViewerContent');
+  if (!viewer) return;
+  viewer.innerHTML = `
+    <div class="receipt-placeholder">
+      <div style="font-size: 32px; margin-bottom: 12px;">📄</div>
+      좌측 리스트에서 전표를 선택하거나<br>영수증을 스캔하면 원본이 표시됩니다.
+    </div>
+  `;
+}
 async function showReceiptInViewer(id) {
   const viewer = document.getElementById('receiptViewerContent');
   if (!viewer) return;
@@ -1166,15 +1176,7 @@ function renderList(){
         const pf = document.getElementById('previewProof');
         if(pf) pf.value = ''; // 증빙 없음
         
-        const viewer = document.getElementById('receiptViewerContent');
-        if (viewer) {
-          viewer.innerHTML = `
-            <div class="receipt-placeholder">
-              <div style="font-size: 32px; margin-bottom: 12px;">📄</div>
-              좌측 리스트에서 전표를 선택하거나<br>영수증을 스캔하면 원본이 표시됩니다.
-            </div>
-          `;
-        }
+        resetReceiptViewer();
       };
     }
   }
@@ -1268,6 +1270,7 @@ document.getElementById('deleteAllBtn').onclick = async () => {
       deleteImage(id).catch(e=>console.error(e.message));
     }
     flashSave('삭제 완료');
+    resetReceiptViewer();
     renderAll();
   } catch (err) {
     console.error(err);
