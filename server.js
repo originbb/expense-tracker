@@ -5,6 +5,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { createClient } from '@libsql/client';
 
 dotenv.config();
@@ -62,6 +63,16 @@ async function initDb() {
     )
   `);
 
+  // 비밀번호 재설정 인증 코드 (이메일당 1건, 재요청 시 덮어씀)
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS password_resets (
+      email TEXT PRIMARY KEY,
+      code_hash TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      attempts INTEGER DEFAULT 0
+    )
+  `);
+
   console.log('✅ 데이터베이스 테이블 확인 완료');
 }
 initDb().then(() => {
@@ -91,6 +102,50 @@ async function cleanupServerImages() {
   }
 }
 
+
+// --- 이메일 발송 설정 ---
+// Brevo HTTP API(443 포트) 연동. API 키가 없으면 콘솔에 출력(개발/테스트용 폴백)
+// HTTP 기반이라 회사망/Render 무료 플랜의 SMTP 포트 차단을 우회하며, 도메인 없이도
+// Brevo에서 인증한 발신자 주소로 누구에게나 발송할 수 있습니다.
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const MAIL_FROM = process.env.MAIL_FROM; // Brevo에서 인증한 발신자 이메일
+const MAIL_FROM_NAME = process.env.MAIL_FROM_NAME || '경비 전표';
+
+async function sendResetCodeMail(email, code) {
+  const subject = '[경비 전표] 비밀번호 재설정 인증 코드';
+  const html = `
+    <div style="font-family:-apple-system,'Apple SD Gothic Neo',sans-serif;max-width:480px;margin:0 auto;padding:24px;">
+      <h2 style="font-size:18px;color:#1d1d1f;">비밀번호 재설정 인증 코드</h2>
+      <p style="font-size:14px;color:#6e6e73;">아래 인증 코드를 입력해 비밀번호를 재설정하세요. (유효시간 10분)</p>
+      <div style="font-size:32px;font-weight:700;letter-spacing:8px;color:#0071e3;text-align:center;padding:20px;background:#f0f0f3;border-radius:12px;margin:16px 0;">${code}</div>
+      <p style="font-size:12px;color:#a1a1a6;">본인이 요청하지 않았다면 이 메일을 무시하세요.</p>
+    </div>`;
+
+  if (!BREVO_API_KEY || !MAIL_FROM) {
+    console.log(`📧 [메일 폴백] ${email} 비밀번호 재설정 인증 코드: ${code} (유효 10분)`);
+    return;
+  }
+
+  const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'api-key': BREVO_API_KEY,
+      'Content-Type': 'application/json',
+      'accept': 'application/json'
+    },
+    body: JSON.stringify({
+      sender: { name: MAIL_FROM_NAME, email: MAIL_FROM },
+      to: [{ email }],
+      subject,
+      htmlContent: html
+    })
+  });
+
+  if (!resp.ok) {
+    const detail = await resp.text();
+    throw new Error(`Brevo 발송 실패 (${resp.status}): ${detail}`);
+  }
+}
 
 // 인증 미들웨어
 function authenticateToken(req, res, next) {
@@ -167,6 +222,105 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: '로그인 중 오류가 발생했습니다.' });
+  }
+});
+
+// 비밀번호 재설정 - 인증 코드 요청
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ error: '이메일 주소를 올바르게 입력해주세요.' });
+  }
+
+  try {
+    const userResult = await db.execute({
+      sql: 'SELECT id FROM users WHERE email = ?',
+      args: [email]
+    });
+
+    if (userResult.rows.length > 0) {
+      // Node 구버전 호환성을 위해 Math.random 사용 (보안상 매우 중요한 키가 아니므로 무방)
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+      const codeHash = await bcrypt.hash(code, 10);
+      const expiresAt = Date.now() + 10 * 60 * 1000; // 10분
+
+      try {
+        await db.execute({
+          sql: `INSERT INTO password_resets (email, code_hash, expires_at, attempts) VALUES (?, ?, ?, 0)
+                ON CONFLICT(email) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at, attempts = 0`,
+          args: [email, codeHash, expiresAt]
+        });
+      } catch (dbErr) {
+        console.error('DB Error:', dbErr);
+        return res.status(500).json({ error: 'DB에 인증 코드를 저장하는 중 오류 발생: ' + (dbErr.message || dbErr) });
+      }
+
+      try {
+        await sendResetCodeMail(email, code);
+      } catch (mailErr) {
+        console.error('Mail Error:', mailErr);
+        return res.status(500).json({ error: '이메일 발송 실패 (SMTP 설정 확인 필요): ' + (mailErr.message || mailErr) });
+      }
+    }
+
+    res.json({ message: '가입된 이메일이라면 인증 코드를 보내드렸습니다. 메일함을 확인해주세요.' });
+  } catch (err) {
+    console.error('General Error:', err);
+    res.status(500).json({ error: '서버 내부 오류: ' + (err.message || err) });
+  }
+});
+
+// 비밀번호 재설정 - 코드 검증 및 새 비밀번호 설정
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { email, code, password } = req.body;
+  if (!email || !code || !password) {
+    return res.status(400).json({ error: '이메일, 인증 코드, 새 비밀번호를 모두 입력해주세요.' });
+  }
+  const pwdRegex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[\W_]).{8,}$/;
+  if (!pwdRegex.test(password)) {
+    return res.status(400).json({ error: '비밀번호는 영문, 숫자, 특수문자를 포함해 최소 8자 이상이어야 합니다.' });
+  }
+
+  try {
+    const result = await db.execute({
+      sql: 'SELECT code_hash, expires_at, attempts FROM password_resets WHERE email = ?',
+      args: [email]
+    });
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ error: '인증 코드를 먼저 요청해주세요.' });
+    }
+
+    const row = result.rows[0];
+    if (Number(row.expires_at) < Date.now()) {
+      await db.execute({ sql: 'DELETE FROM password_resets WHERE email = ?', args: [email] });
+      return res.status(400).json({ error: '인증 코드가 만료되었습니다. 다시 요청해주세요.' });
+    }
+    if (Number(row.attempts) >= 5) {
+      await db.execute({ sql: 'DELETE FROM password_resets WHERE email = ?', args: [email] });
+      return res.status(400).json({ error: '인증 시도 횟수를 초과했습니다. 코드를 다시 요청해주세요.' });
+    }
+
+    const validCode = await bcrypt.compare(String(code), row.code_hash);
+    if (!validCode) {
+      await db.execute({
+        sql: 'UPDATE password_resets SET attempts = attempts + 1 WHERE email = ?',
+        args: [email]
+      });
+      return res.status(400).json({ error: '인증 코드가 일치하지 않습니다.' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    await db.execute({
+      sql: 'UPDATE users SET password_hash = ? WHERE email = ?',
+      args: [passwordHash, email]
+    });
+    await db.execute({ sql: 'DELETE FROM password_resets WHERE email = ?', args: [email] });
+
+    res.json({ message: '비밀번호가 변경되었습니다. 새 비밀번호로 로그인해주세요.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '비밀번호 변경 중 오류: ' + (err.message || err) });
   }
 });
 
@@ -300,6 +454,7 @@ app.post('/api/expenses/sync', authenticateToken, async (req, res) => {
           exp.vendor || ''
         ]
       });
+      const newId = Number(result.lastInsertRowid);
       syncedItems.push({
         id: newId,
         date: exp.date,
