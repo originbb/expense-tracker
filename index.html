@@ -91,7 +91,7 @@
   header.top{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:24px;}
   header.top .title-wrap{flex:1 1 auto;min-width:0;}
   header.top h1{font-size:26px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px;}
-  header.top .sub{color:var(--ink-2);font-size:13px;font-weight:500;}
+  header.top .sub{color:var(--ink-2);font-size:13px;font-weight:500;word-break:keep-all;}
   .header-status{display:flex;align-items:center;gap:12px;}
 
   .card{background:var(--glass-bg);-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--glass-border);}
@@ -375,23 +375,35 @@
 
   /* ERP Form Layout */
   #erpPreviewPanel { overflow-x: auto; }
-  .erp-preview-wrap { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; min-width: max-content; }
-  .erp-left-col { flex: 1; padding-right: 20px; margin-right: 20px; border-right: 1px solid var(--line-2); }
-  .erp-right-col { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; }
+  .erp-preview-wrap { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; min-width: 0; }
+  .erp-left-col { flex: 1; min-width: 0; padding-right: 16px; margin-right: 16px; border-right: 1px solid var(--line-2); }
+  .erp-right-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   
   .erp-grid { 
     display: grid; 
-    grid-template-columns: 80px 1fr 72px 100px; 
+    grid-template-columns: 80px minmax(0, 1fr) 68px minmax(0, 1fr); 
     row-gap: 10px; 
-    column-gap: 12px; 
+    column-gap: 8px; 
     align-items: center; 
   }
   .erp-grid-right {
     display: grid; 
     grid-template-columns: 45px 1fr; 
     row-gap: 10px; 
-    column-gap: 12px; 
+    column-gap: 8px; 
     align-items: center;
+  }
+  .erp-input {
+    height: 28px;
+    border: 1px solid var(--line-2);
+    border-radius: 4px;
+    padding: 0 8px;
+    font-size: 13px;
+    color: var(--ink);
+    background: #fff;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
 
 
@@ -453,6 +465,14 @@
   .erp-summary-inputs .erp-input { flex: 1; height: 32px; font-weight: 500; }
   .erp-summary-inputs .erp-input.num { text-align: right; }
 
+  @media(max-width: 680px) {
+    /* ERP Form Mobile Layout */
+    .erp-preview-wrap { flex-direction: column; min-width: 0; }
+    .erp-left-col { flex: auto; border-right: none; margin-right: 0; padding-right: 0; border-bottom: 1px solid var(--line-2); padding-bottom: 16px; margin-bottom: 16px; width: 100%; }
+    .erp-right-col { flex: auto; width: 100%; min-width: 0; }
+    .erp-grid { grid-template-columns: 80px minmax(0, 1fr); }
+    .erp-grid-right { grid-template-columns: 80px minmax(0, 1fr); }
+  }
 </style>
 </head>
 <body>
@@ -462,7 +482,7 @@
       <h1>영수증 스캔하면 끝! <span style="display: inline-block;">초간단 전표 정리</span></h1>
       <div class="sub">영수증을 찰칵 스캔하면 달력 위에 날짜별로 전표가 자동 등록됩니다. 오늘부터 경비 처리 3초 컷 하세요!</div>
     </div>
-    <div style="display: flex; align-items: flex-start; gap: 12px; margin-left: auto; flex-shrink: 0;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-left: auto; flex-shrink: 0;">
       <button id="themeToggleBtn" class="nav-btn" title="테마 변경"></button>
       <div class="header-status" style="display: flex; align-items: center; gap: 8px;">
         <span class="sub" id="saveState" style="margin-right: 4px;">저장됨</span>
@@ -542,7 +562,7 @@
             <th class="r" style="width:100px">차변금액</th>
             <th class="r" style="width:100px">대변금액</th>
             <th style="width:250px">적요</th>
-            <th class="sticky-col" style="text-align:center;">작업</th>
+            <th class="sticky-col" style="text-align:center;width:130px;">작업</th>
           </tr>
         </thead>
         <tbody id="tbodyErp"></tbody>
@@ -1098,7 +1118,7 @@ function renderList(){
         const e = entries.find(x => String(x.id) === String(id));
         if (e) {
           document.getElementById('previewVendor').value = e.vendor || '';
-          document.getElementById('previewName').value = localStorage.getItem('expense_user_name') || '임직원';
+          document.getElementById('previewName').value = e.employeeName || (isLoggedIn() ? (localStorage.getItem('expense_user_name') || '사원명 입력') : '사원명 입력');
           const pf = document.getElementById('previewProof');
           if(pf) pf.value = '지출증빙_개인카드';
         }
@@ -1112,7 +1132,7 @@ function renderList(){
         totalRow.style.background = 'var(--blue-soft)';
         
         // 미지급금 클릭 시 하단 박스 항목 변경
-        const userName = localStorage.getItem('expense_user_name') || '임직원';
+        const userName = isLoggedIn() ? (localStorage.getItem('expense_user_name') || '사원명 입력') : '사원명 입력';
         document.getElementById('previewVendor').value = '본사 여의도';
         document.getElementById('previewName').value = userName;
         const pf = document.getElementById('previewProof');
@@ -1359,8 +1379,8 @@ async function submitEntry(){
     debit,credit:0,
     memo,
     vendor:document.getElementById('fVendor').value.trim(),
-    department: localStorage.getItem('expense_user_team') || '',
-    employeeName: localStorage.getItem('expense_user_name') || '',
+    department: isLoggedIn() ? (localStorage.getItem('expense_user_team') || '') : '',
+    employeeName: isLoggedIn() ? (localStorage.getItem('expense_user_name') || '') : '사원명 입력',
   };
 
   flashSave('저장 중…');
@@ -1916,8 +1936,8 @@ async function fillFromReceipt(files){
           credit: 0,
           memo: r.memo || '',
           vendor: r.vendor || '',
-          department: localStorage.getItem('expense_user_team') || '',
-          employeeName: localStorage.getItem('expense_user_name') || ''
+          department: isLoggedIn() ? (localStorage.getItem('expense_user_team') || '') : '',
+          employeeName: isLoggedIn() ? (localStorage.getItem('expense_user_name') || '') : '사원명 입력'
         };
         
         if (isLoggedIn()) {
@@ -2469,7 +2489,7 @@ function updateAuthUI() {
     const email = localStorage.getItem('expense_user_email') || '사용자';
     container.innerHTML = `
       <div class="auth-badge user" id="accountBtn" style="cursor:pointer;" title="계정 관리">
-        ✅ 로그인됨: ${email.split('@')[0]}
+        ✅ 로그인됨
       </div>
     `;
     
@@ -2511,6 +2531,8 @@ function updateAuthUI() {
       if (confirm('로그아웃 하시겠습니까?')) {
         localStorage.removeItem('expense_user_token');
         localStorage.removeItem('expense_user_email');
+        localStorage.removeItem('expense_user_name');
+        localStorage.removeItem('expense_user_team');
         location.reload();
       }
     };
@@ -2526,6 +2548,8 @@ function updateAuthUI() {
             alert('회원 탈퇴가 완료되었습니다.');
             localStorage.removeItem('expense_user_token');
             localStorage.removeItem('expense_user_email');
+            localStorage.removeItem('expense_user_name');
+            localStorage.removeItem('expense_user_team');
             location.reload();
           } else {
             const data = await res.json();
@@ -2540,7 +2564,7 @@ function updateAuthUI() {
   } else {
     container.innerHTML = `
       <div class="auth-badge guest" id="navLoginBtn">
-        ⚠️ 게스트 모드 (로그인/동기화)
+        ⚠️ 게스트 모드 (동기화)
       </div>
     `;
     
