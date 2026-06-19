@@ -545,7 +545,10 @@
       <div>
         <h2 id="listTitleErp">분개전표입력</h2><span class="count" id="listCountErp"></span>
       </div>
-      <button class="btn btn-ghost" id="deleteAllBtn" style="color:var(--red); font-size:13px; height:28px; padding:0 8px;">일괄삭제</button>
+      <div style="display: flex; gap: 4px; align-items: center;">
+        <button class="btn btn-ghost" onclick="newEntry()" style="color:var(--blue); font-size:13px; height:28px; padding:0 8px;">+ 추가</button>
+        <button class="btn btn-ghost" id="deleteAllBtn" style="color:var(--red); font-size:13px; height:28px; padding:0 8px;">일괄삭제</button>
+      </div>
     </div>
     <div style="display: flex; gap: 24px; padding: 12px 20px; background: #fff; border-bottom: 1px solid var(--line-2);">
       <div style="font-size: 13px; display: flex; align-items: center; gap: 8px;">
