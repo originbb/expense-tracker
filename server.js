@@ -23,6 +23,47 @@ if (!JWT_SECRET) {
   process.exit(1);
 }
 
+// 비밀번호 해시 비용 (무차별 대입 내성 강화)
+const PWD_COST = 12;
+
+// --- 회원정보(PII: 이름/팀) 필드 암호화 (AES-256-GCM) ---
+// PII_ENCRYPTION_KEY 환경변수가 있으면 활성화. 어떤 문자열이든 SHA-256으로 32바이트 키로 정규화한다.
+// 키가 없으면 기존처럼 평문으로 동작(경고 출력)하며, 레거시 평문 데이터도 그대로 읽힌다.
+const PII_KEY = process.env.PII_ENCRYPTION_KEY
+  ? crypto.createHash('sha256').update(process.env.PII_ENCRYPTION_KEY).digest()
+  : null;
+const ENC_PREFIX = 'enc:v1:';
+if (!PII_KEY) {
+  console.warn('⚠️ PII_ENCRYPTION_KEY 미설정: 이름/팀이 평문으로 저장됩니다. 운영에서는 키 설정을 권장합니다.');
+}
+
+function encryptPII(plain) {
+  if (!PII_KEY || plain == null || plain === '') return plain == null ? '' : plain;
+  if (typeof plain === 'string' && plain.startsWith(ENC_PREFIX)) return plain; // 이미 암호화됨
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', PII_KEY, iv);
+  const ct = Buffer.concat([cipher.update(String(plain), 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return ENC_PREFIX + Buffer.concat([iv, tag, ct]).toString('base64');
+}
+
+function decryptPII(stored) {
+  if (stored == null || stored === '') return '';
+  // 레거시 평문(접두사 없음)은 그대로 반환 → 마이그레이션 없이도 호환
+  if (typeof stored !== 'string' || !stored.startsWith(ENC_PREFIX)) return stored;
+  if (!PII_KEY) return '';
+  try {
+    const raw = Buffer.from(stored.slice(ENC_PREFIX.length), 'base64');
+    const iv = raw.subarray(0, 12), tag = raw.subarray(12, 28), ct = raw.subarray(28);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', PII_KEY, iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8');
+  } catch (e) {
+    console.error('PII 복호화 실패:', e.message);
+    return '';
+  }
+}
+
 // Render 등 리버스 프록시 뒤에서 클라이언트 실제 IP(X-Forwarded-For)를 신뢰 (레이트 리밋용)
 app.set('trust proxy', 1);
 
@@ -93,15 +134,15 @@ async function initDb() {
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       name TEXT,
-      team TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
   try { await db.execute("ALTER TABLE users ADD COLUMN name TEXT"); } catch(e) {}
-  try { await db.execute("ALTER TABLE users ADD COLUMN team TEXT"); } catch(e) {}
   // 토큰 무효화용 버전. 비밀번호 변경 시 증가시켜 기존 발급 토큰을 모두 무효화한다.
   try { await db.execute("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 0"); } catch(e) {}
+  // team 기능 제거: 기존 DB에 남아있는 team 컬럼 정리 (미지원 버전이면 무시)
+  try { await db.execute("ALTER TABLE users DROP COLUMN team"); } catch(e) {}
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS expenses (
@@ -141,6 +182,27 @@ async function initDb() {
   `);
 
   console.log('✅ 데이터베이스 테이블 확인 완료');
+
+  // 일회성 마이그레이션: 키가 설정돼 있으면 기존 평문 이름을 암호화한다.
+  if (PII_KEY) {
+    try {
+      const users = await db.execute('SELECT id, name FROM users');
+      let migrated = 0;
+      for (const u of users.rows) {
+        const nameNeedsEnc = (typeof u.name === 'string' && u.name && !u.name.startsWith(ENC_PREFIX));
+        if (nameNeedsEnc) {
+          await db.execute({
+            sql: 'UPDATE users SET name = ? WHERE id = ?',
+            args: [encryptPII(u.name || ''), u.id]
+          });
+          migrated++;
+        }
+      }
+      if (migrated > 0) console.log(`🔐 PII 마이그레이션: 이름 ${migrated}건 암호화 완료`);
+    } catch (e) {
+      console.error('PII 마이그레이션 실패:', e.message);
+    }
+  }
 }
 initDb().then(() => {
   // 시작 시 1회 실행 후 12시간마다 실행
@@ -253,7 +315,7 @@ function authenticateToken(req, res, next) {
 
 // 회원가입
 app.post('/api/auth/register', authLimiter, async (req, res) => {
-  const { email, password, name, team } = req.body;
+  const { email, password, name } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: '이메일과 비밀번호를 입력해주세요.' });
   }
@@ -263,10 +325,10 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
   }
 
   try {
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, PWD_COST);
     await db.execute({
-      sql: 'INSERT INTO users (email, password_hash, name, team) VALUES (?, ?, ?, ?)',
-      args: [email, passwordHash, name || '', team || '']
+      sql: 'INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?)',
+      args: [email, passwordHash, encryptPII(name || '')]
     });
     res.status(201).json({ message: '회원가입이 완료되었습니다.' });
   } catch (err) {
@@ -301,8 +363,9 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       return res.status(400).json({ error: '이메일 또는 비밀번호가 잘못되었습니다.' });
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email, name: user.name, team: user.team, tv: Number(user.token_version || 0) }, JWT_SECRET, { expiresIn: '30d' });
-    res.json({ token, email: user.email, name: user.name, team: user.team });
+    const name = decryptPII(user.name);
+    const token = jwt.sign({ id: user.id, email: user.email, name, tv: Number(user.token_version || 0) }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, email: user.email, name });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: '로그인 중 오류가 발생했습니다.' });
@@ -394,7 +457,7 @@ app.post('/api/auth/reset-password', passwordResetLimiter, async (req, res) => {
       return res.status(400).json({ error: '인증 코드가 일치하지 않습니다.' });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, PWD_COST);
     // 비밀번호 변경 시 token_version을 올려 기존에 발급된 모든 토큰을 무효화한다.
     await db.execute({
       sql: 'UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE email = ?',
@@ -430,14 +493,14 @@ app.delete('/api/auth/me', authenticateToken, async (req, res) => {
 
 // 프로필 수정
 app.put('/api/auth/profile', authenticateToken, async (req, res) => {
-  const { name, team } = req.body;
+  const { name } = req.body;
   try {
     await db.execute({
-      sql: 'UPDATE users SET name = ?, team = ? WHERE id = ?',
-      args: [name || '', team || '', req.user.id]
+      sql: 'UPDATE users SET name = ? WHERE id = ?',
+      args: [encryptPII(name || ''), req.user.id]
     });
-    const token = jwt.sign({ id: req.user.id, email: req.user.email, name: name || '', team: team || '', tv: Number(req.user.tv || 0) }, JWT_SECRET, { expiresIn: '30d' });
-    res.json({ token, name: name || '', team: team || '' });
+    const token = jwt.sign({ id: req.user.id, email: req.user.email, name: name || '', tv: Number(req.user.tv || 0) }, JWT_SECRET, { expiresIn: '30d' });
+    res.json({ token, name: name || '' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: '프로필 수정 중 오류가 발생했습니다.' });

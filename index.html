@@ -1422,7 +1422,7 @@ async function submitEntry(){
     debit,credit:0,
     memo,
     vendor:document.getElementById('fVendor').value.trim(),
-    department: isLoggedIn() ? (localStorage.getItem('expense_user_team') || '') : '',
+    department: '',
     employeeName: isLoggedIn() ? (localStorage.getItem('expense_user_name') || '') : '사원명 입력',
   };
 
@@ -2021,7 +2021,7 @@ async function fillFromReceipt(files){
           credit: 0,
           memo: r.memo || '',
           vendor: r.vendor || '',
-          department: isLoggedIn() ? (localStorage.getItem('expense_user_team') || '') : '',
+          department: '',
           employeeName: isLoggedIn() ? (localStorage.getItem('expense_user_name') || '') : '사원명 입력'
         };
         
@@ -2334,7 +2334,7 @@ document.getElementById('authForm').onsubmit = async (e) => {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name, team })
+        body: JSON.stringify({ email, password, name })
       });
       const data = await res.json();
       if (res.ok) {
@@ -2362,8 +2362,7 @@ document.getElementById('authForm').onsubmit = async (e) => {
         localStorage.setItem('expense_user_token', data.token);
         localStorage.setItem('expense_user_email', data.email);
         localStorage.setItem('expense_user_name', data.name || '');
-        localStorage.setItem('expense_user_team', data.team || '');
-        
+
         setTimeout(async () => {
           closeAuthModal();
           const localDataStr = localStorage.getItem(STORAGE_KEY);
@@ -2595,20 +2594,18 @@ function updateAuthUI() {
     
     document.getElementById('profileUpdateBtn').onclick = async () => {
       const name = document.getElementById('profileName').value.trim();
-      const team = "";
       const btn = document.getElementById('profileUpdateBtn');
       setLoading(btn, true, '정보 수정');
       try {
         const res = await fetch('/api/auth/profile', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', ...getHeaders() },
-          body: JSON.stringify({ name, team })
+          body: JSON.stringify({ name })
         });
         const data = await res.json();
         if(res.ok) {
           localStorage.setItem('expense_user_token', data.token);
           localStorage.setItem('expense_user_name', data.name);
-          localStorage.setItem('expense_user_team', data.team);
           alert('프로필이 업데이트되었습니다.');
         } else {
           alert(data.error || '업데이트 실패');
