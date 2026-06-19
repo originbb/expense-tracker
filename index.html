@@ -1230,6 +1230,7 @@ document.getElementById('confirmDelete').onclick=async()=>{
         flashSave('삭제됨');
       }
       renderAll();
+      if (document.getElementById('dayOverlay').classList.contains('open')) renderDayModal();
       deleteImage(pendingDeleteId).catch(e => console.error(e.message));
       closeConfirm();
     } catch (err) {
