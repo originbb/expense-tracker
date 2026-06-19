@@ -372,6 +372,76 @@ app.get('/api/expenses/:id/image', authenticateToken, async (req, res) => {
     res.status(500).json({ error: '이미지 조회 중 오류가 발생했습니다.' });
   }
 });
+// --- Google Cloud Vision API OCR 프록시 ---
+// POST /api/ocr
+// body: { imageBase64: "data:image/jpeg;base64,..." }
+// response: { text: "인식된 텍스트" } or { fallback: true }
+app.post('/api/ocr', async (req, res) => {
+  const apiKey = process.env.GOOGLE_VISION_API_KEY;
+
+  // API 키 미설정 시 클라이언트가 Tesseract.js로 폴백하도록 안내
+  if (!apiKey) {
+    return res.json({ fallback: true, reason: 'GOOGLE_VISION_API_KEY가 설정되지 않았습니다.' });
+  }
+
+  const { imageBase64 } = req.body;
+  if (!imageBase64) {
+    return res.status(400).json({ error: '이미지 데이터가 없습니다.' });
+  }
+
+  try {
+    // data URL에서 순수 base64 부분만 추출
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+
+    const requestBody = JSON.stringify({
+      requests: [
+        {
+          image: { content: base64Data },
+          features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
+          imageContext: { languageHints: ['ko', 'en'] }
+        }
+      ]
+    });
+
+    // Google Cloud Vision REST API 호출
+    const response = await fetch(
+      `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: requestBody
+      }
+    );
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`Google Vision API 오류 (${response.status}):`, errText);
+      return res.json({ fallback: true, reason: `API 오류: ${response.status}` });
+    }
+
+    const data = await response.json();
+
+    // 응답에서 텍스트 추출
+    const annotation = data.responses?.[0];
+    if (annotation?.error) {
+      console.error('Google Vision 인식 실패:', annotation.error.message);
+      return res.json({ fallback: true, reason: annotation.error.message });
+    }
+
+    const text = annotation?.fullTextAnnotation?.text || '';
+    if (!text) {
+      return res.json({ fallback: true, reason: '텍스트를 인식하지 못했습니다.' });
+    }
+
+    console.log(`✅ Google Vision OCR 성공 - 인식 글자 수: ${text.length}`);
+    return res.json({ text });
+
+  } catch (err) {
+    console.error('Google Vision OCR 처리 중 오류:', err);
+    return res.json({ fallback: true, reason: err.message });
+  }
+});
+
 // 정적 파일 서빙 (index.html 등)
 app.use(express.static(__dirname, {
   index: 'index.html',
