@@ -904,6 +904,8 @@ const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 
 // 첨부 이미지 기준 자동추천 옵션
 const ACCOUNTS=['(판)여비교통비-(시내교통비)','(판)여비교통비-(국내출장비)','미지급금-(직원경비)','(판)복리후생비','(판)소모품비','(판)지급수수료','(판)광고선전비','(판)접대비'];
+// 사용처가 비어있을 때 다운로드 파일명에 쓸 계정과목 → 라벨 매핑
+const ACCOUNT_LABEL={'(판)여비교통비-(시내교통비)':'교통비','(판)여비교통비-(국내출장비)':'숙박비','(판)복리후생비':'식대','(판)소모품비':'소모품','(판)지급수수료':'수수료','(판)광고선전비':'광고선전비','(판)접대비':'접대비','미지급금-(직원경비)':'직원경비'};
 
 // 초기 시드 데이터
 const SEED=[];
@@ -2083,13 +2085,21 @@ document.getElementById('downloadZipBtn').onclick=async()=>{
   try {
     const zip = new JSZip();
     let imgCount = 0;
-    
+    const nameCount = {};  // 같은 날·같은 사용처 중복 시 번호 부여용
+    // 로그인 시 파일명에 사용자 이름 포함 (날짜_이름_사용처)
+    const userName = isLoggedIn() ? (localStorage.getItem('expense_user_name') || '').trim() : '';
+    const safeName = userName.replace(/[\/\\:*?"<>|]/g, '_');
+
     for(const e of rows){
       const dataUrl = await getImage(e.id);
       if(dataUrl){
         const base64Data = dataUrl.split(',')[1];
-        const safeVendor = (e.vendor || '알수없음').replace(/[\/\\:*?"<>|]/g, '_');
-        const fileName = `${e.date}_${safeVendor}_${e.id}.jpg`;
+        const vendorLabel = e.vendor || ACCOUNT_LABEL[e.account] || '알수없음';
+        const safeVendor = vendorLabel.replace(/[\/\\:*?"<>|]/g, '_');
+        const yymmdd = (e.date || '').slice(2).replace(/-/g, '');
+        const base = safeName ? `${yymmdd}_${safeName}_${safeVendor}` : `${yymmdd}_${safeVendor}`;
+        const n = (nameCount[base] = (nameCount[base] || 0) + 1);
+        const fileName = `${base}${n > 1 ? n : ''}.jpg`;
         zip.file(fileName, base64Data, {base64: true});
         imgCount++;
       }
