@@ -1637,12 +1637,12 @@ function initDB(){
 async function saveImage(id, dataUrl){
   if (isLoggedIn() && typeof id === 'number') {
     try {
-      await fetch(`/api/expenses/${id}/image`, {
+      const res = await fetch(`/api/expenses/${id}/image`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getHeaders() },
         body: JSON.stringify({ dataUrl })
       });
-      return;
+      if (res.ok) return;
     } catch(e) {
       console.error('서버 이미지 업로드 실패:', e.message);
     }
