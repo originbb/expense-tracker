@@ -6,6 +6,8 @@ import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
 import { createClient } from '@libsql/client';
 
 dotenv.config();
@@ -15,10 +17,64 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 10000;
-const JWT_SECRET = process.env.JWT_SECRET || 'local-jwt-secret-key-1234567890';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('❌ 치명적 오류: JWT_SECRET 환경변수가 설정되지 않았습니다. 서버를 종료합니다.');
+  process.exit(1);
+}
+
+// Render 등 리버스 프록시 뒤에서 클라이언트 실제 IP(X-Forwarded-For)를 신뢰 (레이트 리밋용)
+app.set('trust proxy', 1);
+
+// --- 보안 헤더 (helmet) ---
+// CSP는 앱이 실제 사용하는 출처만 허용하도록 구성한다.
+// - 인라인 스크립트/핸들러(27곳) 및 인라인 스타일이 많아 'unsafe-inline' 불가피
+// - Tesseract.js(OCR 폴백)가 WASM과 Blob 워커를 사용하므로 wasm-unsafe-eval / blob: 허용
+// - XLSX·Tesseract 코어는 cdnjs / jsdelivr, 학습 데이터는 tessdata 에서 로드
+const CDN = ['https://cdnjs.cloudflare.com', 'https://cdn.jsdelivr.net'];
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "'wasm-unsafe-eval'", 'blob:', ...CDN],
+      // 인라인 이벤트 핸들러(onclick 등 27곳) 허용 — helmet 기본값('none')은 이를 차단함
+      scriptSrcAttr: ["'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", ...CDN],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      connectSrc: ["'self'", 'blob:', 'data:', ...CDN, 'https://tessdata.projectnaptha.com'],
+      workerSrc: ["'self'", 'blob:'],
+      fontSrc: ["'self'", 'data:', ...CDN],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"]
+    }
+  },
+  // 영수증 이미지를 data:/blob:로 표시하므로 리소스 차단 정책은 완화
+  crossOriginEmbedderPolicy: false
+}));
+
+// 개별 영수증 이미지(base64 data URL) 최대 허용 길이 (~약 3.7MB 디코딩). 저장공간 고갈 방지.
+const MAX_IMAGE_CHARS = 5_000_000;
 
 // JSON 파싱 미들웨어 (이미지 Base64 처리를 위해 10MB로 증가)
 app.use(express.json({ limit: '10mb' }));
+
+// --- 레이트 리미팅 (무차별 대입 / 메일 폭탄 방어) ---
+// 로그인·회원가입: IP당 15분에 20회
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' }
+});
+// 비밀번호 재설정(메일 발송 동반): IP당 1시간에 5회
+const passwordResetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' }
+});
 
 // 데이터베이스 설정
 const dbUrl = process.env.TURSO_DATABASE_URL || 'file:local.db';
@@ -44,8 +100,8 @@ async function initDb() {
 
   try { await db.execute("ALTER TABLE users ADD COLUMN name TEXT"); } catch(e) {}
   try { await db.execute("ALTER TABLE users ADD COLUMN team TEXT"); } catch(e) {}
-  try { await db.execute("ALTER TABLE expenses ADD COLUMN department TEXT"); } catch(e) {}
-  try { await db.execute("ALTER TABLE expenses ADD COLUMN employeeName TEXT"); } catch(e) {}
+  // 토큰 무효화용 버전. 비밀번호 변경 시 증가시켜 기존 발급 토큰을 모두 무효화한다.
+  try { await db.execute("ALTER TABLE users ADD COLUMN token_version INTEGER DEFAULT 0"); } catch(e) {}
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS expenses (
@@ -61,6 +117,10 @@ async function initDb() {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
   `);
+
+  // expenses 테이블 생성 이후에 추가 컬럼을 보강 (신규 DB에서도 컬럼이 누락되지 않도록 순서 보장)
+  try { await db.execute("ALTER TABLE expenses ADD COLUMN department TEXT"); } catch(e) {}
+  try { await db.execute("ALTER TABLE expenses ADD COLUMN employeeName TEXT"); } catch(e) {}
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS receipt_images (
@@ -90,19 +150,19 @@ initDb().then(() => {
   console.error('❌ 데이터베이스 초기화 실패:', err);
 });
 
-// --- 서버 스토리지 60일 경과 자동 삭제 로직 ---
+// --- 서버 스토리지 30일 경과 자동 삭제 로직 ---
 async function cleanupServerImages() {
   try {
     const sql = `
       DELETE FROM receipt_images 
       WHERE expense_id IN (
         SELECT id FROM expenses 
-        WHERE date(date, 'start of month', '+1 month', '-1 day', '+60 days') < date('now')
+        WHERE date(date, 'start of month', '+1 month', '-1 day', '+30 days') < date('now')
       )
     `;
     const res = await db.execute(sql);
     if (res.rowsAffected > 0) {
-      console.log(`🧹 서버 자동 삭제: 60일 경과 영수증 이미지 ${res.rowsAffected}개 삭제 완료`);
+      console.log(`🧹 서버 자동 삭제: 30일 경과 영수증 이미지 ${res.rowsAffected}개 삭제 완료`);
     }
   } catch (err) {
     console.error('서버 영수증 이미지 자동 정리 실패:', err);
@@ -158,24 +218,41 @@ async function sendResetCodeMail(email, code) {
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  
+
   if (!token) {
     return res.status(401).json({ error: '인증 토큰이 필요합니다.' });
   }
 
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ error: '유효하지 않거나 만료된 토큰입니다.' });
-    }
-    req.user = user;
-    next();
-  });
+  let payload;
+  try {
+    payload = jwt.verify(token, JWT_SECRET);
+  } catch (err) {
+    return res.status(403).json({ error: '유효하지 않거나 만료된 토큰입니다.' });
+  }
+
+  // 토큰 무효화 검사: 비밀번호 변경/탈퇴 시 token_version이 올라가 기존 토큰이 무효화된다.
+  db.execute({ sql: 'SELECT token_version FROM users WHERE id = ?', args: [payload.id] })
+    .then(result => {
+      if (result.rows.length === 0) {
+        return res.status(403).json({ error: '유효하지 않은 토큰입니다.' });
+      }
+      const currentTv = Number(result.rows[0].token_version || 0);
+      if (Number(payload.tv || 0) !== currentTv) {
+        return res.status(403).json({ error: '세션이 만료되었습니다. 다시 로그인해주세요.' });
+      }
+      req.user = payload;
+      next();
+    })
+    .catch(err => {
+      console.error('Auth check error:', err);
+      return res.status(500).json({ error: '인증 처리 중 오류가 발생했습니다.' });
+    });
 }
 
 // --- 인증 API ---
 
 // 회원가입
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', authLimiter, async (req, res) => {
   const { email, password, name, team } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: '이메일과 비밀번호를 입력해주세요.' });
@@ -202,7 +279,7 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // 로그인
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: '이메일과 비밀번호를 입력해주세요.' });
@@ -224,7 +301,7 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: '이메일 또는 비밀번호가 잘못되었습니다.' });
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email, name: user.name, team: user.team }, JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign({ id: user.id, email: user.email, name: user.name, team: user.team, tv: Number(user.token_version || 0) }, JWT_SECRET, { expiresIn: '30d' });
     res.json({ token, email: user.email, name: user.name, team: user.team });
   } catch (err) {
     console.error(err);
@@ -233,7 +310,7 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // 비밀번호 재설정 - 인증 코드 요청
-app.post('/api/auth/forgot-password', async (req, res) => {
+app.post('/api/auth/forgot-password', passwordResetLimiter, async (req, res) => {
   const { email } = req.body;
   if (!email || !email.includes('@')) {
     return res.status(400).json({ error: '이메일 주소를 올바르게 입력해주세요.' });
@@ -259,26 +336,26 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         });
       } catch (dbErr) {
         console.error('DB Error:', dbErr);
-        return res.status(500).json({ error: 'DB에 인증 코드를 저장하는 중 오류 발생: ' + (dbErr.message || dbErr) });
+        return res.status(500).json({ error: '인증 코드 처리 중 오류가 발생했습니다.' });
       }
 
       try {
         await sendResetCodeMail(email, code);
       } catch (mailErr) {
         console.error('Mail Error:', mailErr);
-        return res.status(500).json({ error: '이메일 발송 실패 (SMTP 설정 확인 필요): ' + (mailErr.message || mailErr) });
+        return res.status(500).json({ error: '이메일 발송 중 오류가 발생했습니다.' });
       }
     }
 
     res.json({ message: '가입된 이메일이라면 인증 코드를 보내드렸습니다. 메일함을 확인해주세요.' });
   } catch (err) {
     console.error('General Error:', err);
-    res.status(500).json({ error: '서버 내부 오류: ' + (err.message || err) });
+    res.status(500).json({ error: '서버 내부 오류가 발생했습니다.' });
   }
 });
 
 // 비밀번호 재설정 - 코드 검증 및 새 비밀번호 설정
-app.post('/api/auth/reset-password', async (req, res) => {
+app.post('/api/auth/reset-password', passwordResetLimiter, async (req, res) => {
   const { email, code, password } = req.body;
   if (!email || !code || !password) {
     return res.status(400).json({ error: '이메일, 인증 코드, 새 비밀번호를 모두 입력해주세요.' });
@@ -318,8 +395,9 @@ app.post('/api/auth/reset-password', async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    // 비밀번호 변경 시 token_version을 올려 기존에 발급된 모든 토큰을 무효화한다.
     await db.execute({
-      sql: 'UPDATE users SET password_hash = ? WHERE email = ?',
+      sql: 'UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE email = ?',
       args: [passwordHash, email]
     });
     await db.execute({ sql: 'DELETE FROM password_resets WHERE email = ?', args: [email] });
@@ -327,7 +405,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
     res.json({ message: '비밀번호가 변경되었습니다. 새 비밀번호로 로그인해주세요.' });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: '비밀번호 변경 중 오류: ' + (err.message || err) });
+    res.status(500).json({ error: '비밀번호 변경 중 오류가 발생했습니다.' });
   }
 });
 
@@ -358,7 +436,7 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
       sql: 'UPDATE users SET name = ?, team = ? WHERE id = ?',
       args: [name || '', team || '', req.user.id]
     });
-    const token = jwt.sign({ id: req.user.id, email: req.user.email, name: name || '', team: team || '' }, JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign({ id: req.user.id, email: req.user.email, name: name || '', team: team || '', tv: Number(req.user.tv || 0) }, JWT_SECRET, { expiresIn: '30d' });
     res.json({ token, name: name || '', team: team || '' });
   } catch (err) {
     console.error(err);
@@ -494,7 +572,8 @@ app.post('/api/expenses/sync', authenticateToken, async (req, res) => {
         employeeName: exp.employeeName || ''
       });
       
-      if (exp.dataUrl) {
+      // 용량 초과 이미지는 건너뛴다 (전표 본문은 정상 동기화)
+      if (exp.dataUrl && typeof exp.dataUrl === 'string' && exp.dataUrl.length <= MAX_IMAGE_CHARS) {
         await db.execute({
           sql: `INSERT INTO receipt_images (expense_id, image_data) VALUES (?, ?)
                 ON CONFLICT(expense_id) DO UPDATE SET image_data = excluded.image_data`,
@@ -514,7 +593,10 @@ app.post('/api/expenses/:id/image', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { dataUrl } = req.body;
   if (!dataUrl) return res.status(400).json({ error: '이미지 데이터가 없습니다.' });
-  
+  if (typeof dataUrl !== 'string' || dataUrl.length > MAX_IMAGE_CHARS) {
+    return res.status(413).json({ error: '이미지 용량이 너무 큽니다. 더 작은 파일을 사용해주세요.' });
+  }
+
   try {
     const check = await db.execute({
       sql: 'SELECT id FROM expenses WHERE id = ? AND user_id = ?',
@@ -560,7 +642,7 @@ app.get('/api/expenses/:id/image', authenticateToken, async (req, res) => {
 // POST /api/ocr
 // body: { imageBase64: "data:image/jpeg;base64,..." }
 // response: { text: "인식된 텍스트" } or { fallback: true }
-app.post('/api/ocr', async (req, res) => {
+app.post('/api/ocr', authenticateToken, async (req, res) => {
   const apiKey = process.env.GOOGLE_VISION_API_KEY;
 
   // API 키 미설정 시 클라이언트가 Tesseract.js로 폴백하도록 안내
@@ -571,6 +653,9 @@ app.post('/api/ocr', async (req, res) => {
   const { imageBase64 } = req.body;
   if (!imageBase64) {
     return res.status(400).json({ error: '이미지 데이터가 없습니다.' });
+  }
+  if (typeof imageBase64 !== 'string' || imageBase64.length > MAX_IMAGE_CHARS) {
+    return res.status(413).json({ error: '이미지 용량이 너무 큽니다.' });
   }
 
   try {
@@ -626,13 +711,9 @@ app.post('/api/ocr', async (req, res) => {
   }
 });
 
-// 정적 파일 서빙 (index.html 등)
-app.use(express.static(__dirname, {
-  index: 'index.html',
-  extensions: ['html'],
-}));
-
-// 404 및 SPA 라우팅 지원: 존재하지 않는 경로로 접근 시 index.html 반환
+// 정적 파일 서빙: 프로젝트 루트 전체를 노출하지 않도록 index.html만 명시적으로 서빙한다.
+// (index.html은 외부 CDN/data URL만 사용하므로 별도 로컬 정적 자산이 없다.)
+// 이렇게 하면 server.js / local.db / package.json 등 민감 파일이 정적으로 다운로드되는 것을 막는다.
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });

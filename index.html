@@ -650,7 +650,7 @@
   </div><!-- /.split-layout -->
 
   <div style="margin-top:24px; text-align:left; font-size:12.5px; color:var(--ink-2); line-height:1.5; padding: 0 4px; margin-bottom: 24px;">
-    ⚠️ <strong style="color:var(--ink);">안내</strong>: 영수증 원본 이미지는 <strong style="color:var(--ink);">해당 월 종료 60일 이후 자동 삭제</strong>됩니다. 증빙 자료 보관이 필요하신 경우 반드시 사전에 엑셀 및 영수증 다운로드 기능을 통해 백업해 주세요.
+    ⚠️ <strong style="color:var(--ink);">안내</strong>: 영수증 원본 이미지는 <strong style="color:var(--ink);">해당 월 종료 30일 이후 자동 삭제</strong>됩니다. 증빙 자료 보관이 필요하신 경우 반드시 사전에 엑셀 및 영수증 다운로드 기능을 통해 백업해 주세요.
   </div>
 
 </div><!-- /.wrap : 모달 오버레이는 body 직속으로 분리해 fixed 위치/stacking 보장 -->
@@ -900,6 +900,8 @@ function setLoading(btn, isLoading, text) {
 const STORAGE_KEY='expense_ledger_v4';
 const won=n=>Number(n||0).toLocaleString('ko-KR');
 const pad=n=>String(n).padStart(2,'0');
+// 저장형 XSS 방지: innerHTML 템플릿에 사용자 입력을 넣기 전 HTML 특수문자를 이스케이프한다.
+const escapeHtml=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 
 // 첨부 이미지 기준 자동추천 옵션
@@ -1136,10 +1138,10 @@ function renderList(){
       return `
       <tr class="row erp-row" data-id="${e.id}" style="cursor: pointer;">
         <td class="muted">${String(i+1).padStart(4, '0')}</td>
-        <td>${e.account}</td>
+        <td>${escapeHtml(e.account)}</td>
         <td class="r debit">${e.debit?won(e.debit):'<span class="muted">0</span>'}</td>
         <td class="r credit">${e.credit?won(e.credit):'<span class="muted">0</span>'}</td>
-        <td style="white-space:normal" class="muted">${memoStr}</td>
+        <td style="white-space:normal" class="muted">${escapeHtml(memoStr)}</td>
         <td class="sticky-col" style="vertical-align: middle;"><div class="row-act" style="justify-content: center; width: 100%;">
           <button class="icon-btn" data-edit="${e.id}" title="수정" onclick="event.stopPropagation();">✎</button>
           <button class="icon-btn del" data-del="${e.id}" title="삭제" onclick="event.stopPropagation();">✕</button>
@@ -1339,8 +1341,8 @@ function renderDayModal(){
   list.innerHTML=rows.map(e=>`
     <div class="dayrow">
       <div class="info">
-        <div class="acc">${e.account}</div>
-        <div class="memo">${e.memo||''}${e.vendor?` · ${e.vendor}`:''}</div>
+        <div class="acc">${escapeHtml(e.account)}</div>
+        <div class="memo">${escapeHtml(e.memo||'')}${e.vendor?` · ${escapeHtml(e.vendor)}`:''}</div>
       </div>
       <div class="amt2">${won(e.debit)}</div>
       <div class="acts">
@@ -1729,7 +1731,7 @@ async function renameImage(oldId, newId) {
   }
 }
 
-// 60일 경과한 오래된 영수증 자동 삭제 (IndexedDB 클린업)
+// 30일 경과한 오래된 영수증 자동 삭제 (IndexedDB 클린업)
 async function cleanupOldImages() {
   try {
     const db = await initDB();
@@ -1739,33 +1741,33 @@ async function cleanupOldImages() {
     let deletedCount = 0;
     const now = Date.now();
     
-    // 1. 전표 데이터 기준 (해당 월 종료일 + 60일 경과)
+    // 1. 전표 데이터 기준 (해당 월 종료일 + 30일 경과)
     if (typeof entries !== 'undefined' && Array.isArray(entries)) {
       entries.forEach(e => {
         if (!e.date) return;
         const [yyyy, mm] = e.date.split('-');
         const monthEnd = new Date(yyyy, mm, 0).getTime();
-        const sixtyDaysMs = 60 * 24 * 60 * 60 * 1000;
-        if (now > monthEnd + sixtyDaysMs) {
+        const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+        if (now > monthEnd + thirtyDaysMs) {
           store.delete(isNaN(e.id) ? e.id : Number(e.id));
           deletedCount++;
         }
       });
     }
 
-    // 2. 과거 게스트 데이터 등 (타임스탬프 키 기준 60일 경과)
-    const sixtyDaysAgo = now - (60 * 24 * 60 * 60 * 1000);
+    // 2. 과거 게스트 데이터 등 (타임스탬프 키 기준 30일 경과)
+    const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
     const req = store.openCursor();
     req.onsuccess = (ev) => {
       const cursor = ev.target.result;
       if (cursor) {
-        if (typeof cursor.key === 'number' && cursor.key > 1000000000000 && cursor.key < sixtyDaysAgo) {
+        if (typeof cursor.key === 'number' && cursor.key > 1000000000000 && cursor.key < thirtyDaysAgo) {
           cursor.delete();
           deletedCount++;
         }
         cursor.continue();
       } else if (deletedCount > 0) {
-        console.log(`🧹 60일 경과 영수증 이미지 자동 삭제 완료`);
+        console.log(`🧹 30일 경과 영수증 이미지 자동 삭제 완료`);
       }
     };
   } catch (e) {
@@ -1859,6 +1861,47 @@ function resizeImage(file, maxDim = 1600, binarize = false, allowUpscale = false
   });
 }
 
+// 저장용 자동 압축: 데이터 URL 길이가 목표 이하가 될 때까지 품질 → 해상도 순으로 단계적으로 낮춘다.
+// 서버 한도(MAX_IMAGE_CHARS=5,000,000)보다 여유 있게 잡아 업로드가 거부되지 않도록 한다.
+function resizeImageForSave(file, maxChars = 4_500_000) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const render = (maxDim, q) => {
+          const maxSide = Math.max(img.width, img.height);
+          const scale = Math.min(1, maxDim / maxSide);
+          const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, w, h);
+          return canvas.toDataURL('image/jpeg', q);
+        };
+        const dims = [1200, 1000, 800, 640, 480];
+        const qualities = [0.85, 0.7, 0.55, 0.4];
+        let url = render(dims[0], qualities[0]);
+        // 1) 품질을 먼저 낮춰 본다 (해상도 유지)
+        for (let qi = 1; qi < qualities.length && url.length > maxChars; qi++) {
+          url = render(dims[0], qualities[qi]);
+        }
+        // 2) 그래도 크면 해상도를 단계적으로 축소한다 (최저 품질 유지)
+        for (let di = 1; di < dims.length && url.length > maxChars; di++) {
+          url = render(dims[di], qualities[qualities.length - 1]);
+        }
+        resolve(url);
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 const ocrProgress=document.getElementById('ocrProgress');
 const ocrBar=document.getElementById('ocrBar');
 
@@ -1920,7 +1963,7 @@ async function fillFromReceipt(files){
     const file = files[i];
     ocrBar.style.width='0%';
     try {
-      const saveUrl = await resizeImage(file, 1200, false);
+      const saveUrl = await resizeImageForSave(file);
       // Google Vision OCR용: 이진화 없이 원본 품질 이미지 사용 (API가 직접 처리)
       const imgUrlForClova = await resizeImage(file, 1600, false);
       // Tesseract 폴백용: 이진화 처리 이미지
