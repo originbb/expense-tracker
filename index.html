@@ -211,6 +211,17 @@
   .modal-close:hover{background:var(--ink);color:#fff;border-color:var(--ink);}
   .modal-body{padding:22px;}
 
+  /* receipt fullscreen zoom */
+  .zoom-overlay{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:100;display:none;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;}
+  .zoom-overlay.open{display:flex;animation:fade .18s ease;}
+  .zoom-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;touch-action:none;}
+  #zoomImg{max-width:100%;max-height:100%;object-fit:contain;transform-origin:center center;will-change:transform;cursor:grab;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;}
+  #zoomImg.animating{transition:transform .22s var(--ease);}
+  #zoomImg.grabbing{cursor:grabbing;}
+  .zoom-close{position:absolute;top:16px;right:16px;z-index:2;width:42px;height:42px;border-radius:50%;border:none;background:rgba(255,255,255,.14);color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.13s;-webkit-tap-highlight-color:transparent;}
+  .zoom-close:hover{background:rgba(255,255,255,.28);}
+  .receipt-viewer-content img{cursor:zoom-in;}
+
   /* day detail list */
   .dayrow{display:flex;align-items:center;gap:10px;padding:11px 4px;border-bottom:1px solid var(--line);}
   .dayrow:last-of-type{border-bottom:none;}
@@ -684,6 +695,14 @@
     </div>
   </div>
 
+  <!-- RECEIPT FULLSCREEN ZOOM -->
+  <div class="zoom-overlay" id="receiptZoomOverlay">
+    <button class="zoom-close" id="zoomClose" aria-label="닫기">✕</button>
+    <div class="zoom-stage" id="zoomStage">
+      <img id="zoomImg" alt="영수증 원본" draggable="false">
+    </div>
+  </div>
+
   <div class="overlay" id="overlay">
     <div class="modal">
       <div class="modal-head">
@@ -1092,6 +1111,8 @@ async function showReceiptInViewer(id) {
     const dataUrl = await getImage(id);
     if (dataUrl) {
       viewer.innerHTML = `<img src="${dataUrl}" alt="영수증 원본">`;
+      const img = viewer.querySelector('img');
+      if (img) img.onclick = () => openZoom(dataUrl);
     } else {
       viewer.innerHTML = `
         <div class="receipt-placeholder">
@@ -2063,8 +2084,124 @@ async function fillFromReceipt(files){
   setTimeout(()=>{ocrProgress.style.display='none';ocrBar.style.width='0%';},600);
 }
 
+/* ---- receipt fullscreen zoom/pan ---- */
+(function(){
+  const overlay = document.getElementById('receiptZoomOverlay');
+  const stage = document.getElementById('zoomStage');
+  const img = document.getElementById('zoomImg');
+  const MIN = 1, MAX = 5;
+  let scale = 1, tx = 0, ty = 0;
+
+  function clampScale(s){ return Math.max(MIN, Math.min(MAX, s)); }
+  function clampPan(){
+    // keep the image from drifting too far off-screen
+    const maxX = Math.max(0, (img.offsetWidth * scale - window.innerWidth) / 2);
+    const maxY = Math.max(0, (img.offsetHeight * scale - window.innerHeight) / 2);
+    tx = Math.max(-maxX, Math.min(maxX, tx));
+    ty = Math.max(-maxY, Math.min(maxY, ty));
+  }
+  function apply(){ clampPan(); img.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`; }
+  function reset(){ scale = 1; tx = 0; ty = 0; img.style.transform = ''; }
+  function animate(on){ img.classList.toggle('animating', on); }
+
+  window.openZoom = function(src){
+    img.src = src; reset(); overlay.classList.add('open');
+  };
+  window.closeZoom = function(){
+    overlay.classList.remove('open'); img.src = ''; reset();
+  };
+
+  document.getElementById('zoomClose').onclick = () => closeZoom();
+
+  // zoom toward a screen point, keeping that point stable
+  function zoomTo(newScale, cx, cy){
+    newScale = clampScale(newScale);
+    const ratio = newScale / scale;
+    // point relative to image center (stage center == viewport center)
+    const ox = cx - window.innerWidth / 2;
+    const oy = cy - window.innerHeight / 2;
+    tx = ox - (ox - tx) * ratio;
+    ty = oy - (oy - ty) * ratio;
+    scale = newScale;
+    apply();
+  }
+
+  // ---- double tap / double click ----
+  let lastTap = 0;
+  function toggleZoom(cx, cy){
+    animate(true);
+    if (scale > 1.01) { reset(); }
+    else { zoomTo(2.5, cx, cy); }
+    setTimeout(() => animate(false), 240);
+  }
+  img.addEventListener('dblclick', e => { e.preventDefault(); toggleZoom(e.clientX, e.clientY); });
+
+  // ---- mouse drag pan ----
+  let dragging = false, lastX = 0, lastY = 0;
+  img.addEventListener('mousedown', e => {
+    if (scale <= 1.01) return;
+    dragging = true; lastX = e.clientX; lastY = e.clientY;
+    img.classList.add('grabbing'); e.preventDefault();
+  });
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    tx += e.clientX - lastX; ty += e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY; apply();
+  });
+  window.addEventListener('mouseup', () => { dragging = false; img.classList.remove('grabbing'); });
+
+  // ---- wheel zoom (desktop) ----
+  stage.addEventListener('wheel', e => {
+    if (!overlay.classList.contains('open')) return;
+    e.preventDefault();
+    zoomTo(scale * (e.deltaY < 0 ? 1.12 : 0.89), e.clientX, e.clientY);
+  }, { passive: false });
+
+  // ---- touch: pinch zoom + 1-finger pan + double tap ----
+  let pinchDist = 0, pinchScale = 1, pinchCX = 0, pinchCY = 0;
+  let touchPan = false, tLastX = 0, tLastY = 0;
+  function dist(t){ const dx = t[0].clientX - t[1].clientX, dy = t[0].clientY - t[1].clientY; return Math.hypot(dx, dy); }
+
+  stage.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      pinchDist = dist(e.touches); pinchScale = scale;
+      pinchCX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      pinchCY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      touchPan = false;
+    } else if (e.touches.length === 1) {
+      const now = Date.now();
+      if (now - lastTap < 300) { e.preventDefault(); toggleZoom(e.touches[0].clientX, e.touches[0].clientY); lastTap = 0; }
+      else { lastTap = now; }
+      if (scale > 1.01) { touchPan = true; tLastX = e.touches[0].clientX; tLastY = e.touches[0].clientY; }
+    }
+  }, { passive: false });
+
+  stage.addEventListener('touchmove', e => {
+    if (e.touches.length === 2 && pinchDist) {
+      e.preventDefault();
+      const ratio = dist(e.touches) / pinchDist;
+      zoomTo(pinchScale * ratio, pinchCX, pinchCY);
+    } else if (e.touches.length === 1 && touchPan) {
+      e.preventDefault();
+      tx += e.touches[0].clientX - tLastX; ty += e.touches[0].clientY - tLastY;
+      tLastX = e.touches[0].clientX; tLastY = e.touches[0].clientY; apply();
+    }
+  }, { passive: false });
+
+  stage.addEventListener('touchend', e => {
+    if (e.touches.length < 2) pinchDist = 0;
+    if (e.touches.length === 0) touchPan = false;
+  });
+
+  // ---- backdrop tap closes when not zoomed ----
+  stage.addEventListener('click', e => {
+    if (e.target !== img && scale <= 1.01) closeZoom();
+  });
+})();
+
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape')return;
+  if(document.getElementById('receiptZoomOverlay').classList.contains('open')){closeZoom();return;}
   if(document.getElementById('confirmOverlay').classList.contains('open')){closeConfirm();return;}
   if(document.getElementById('overlay').classList.contains('open')){closeModal();return;}
   if(document.getElementById('dayOverlay').classList.contains('open')){closeDayModal();return;}
