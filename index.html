@@ -571,18 +571,18 @@
           <span id="listMonthLabel" style="font-size:16px; font-weight:700; color:var(--ink); min-width:74px; text-align:center;"></span>
           <button class="nav-btn" id="listNextBtn" title="다음 달" style="width:28px; height:28px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
         </div>
-        <span class="count" id="listCountErp"></span>
       </div>
       <div style="display: flex; gap: 6px; align-items: center;">
         <button class="nav-btn" onclick="newEntry()" title="수동 전표 추가" style="width:30px; height:30px; font-size:14px;">➕</button>
         <button class="nav-btn" id="deleteAllBtn" title="해당 월 일괄 삭제" style="width:30px; height:30px; font-size:14px; color:var(--red); border-color:var(--line);">🗑️</button>
       </div>
     </div>
-    <div style="display: flex; gap: 24px; padding: 12px 20px; background: #fff; border-bottom: 1px solid var(--line-2);">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 12px 20px; background: #fff; border-bottom: 1px solid var(--line-2);">
       <div style="font-size: 13px; display: flex; align-items: center; gap: 8px;">
         <span style="font-weight: 600; color: var(--ink-2);">회계일</span>
         <span id="erpAccountingDate" style="font-weight: 700; color: var(--blue);"></span>
       </div>
+      <span class="count" id="listCountErp" style="margin:0; font-size:13px; font-weight:600; color:var(--ink-3);"></span>
     </div>
     <div class="table-scroll">
       <table>
@@ -973,13 +973,27 @@ function getHeaders() {
   return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
 
+let sessionExpired = false;
+function clearAuthStorage() {
+  localStorage.removeItem('expense_user_token');
+  localStorage.removeItem('expense_user_email');
+  localStorage.removeItem('expense_user_name');
+  localStorage.removeItem('expense_user_team');
+}
 async function loadEntries() {
+  sessionExpired = false;
   if (isLoggedIn()) {
     try {
       const res = await fetch('/api/expenses', { headers: getHeaders() });
       if (res.ok) {
         entries = await res.json();
         return;
+      }
+      // 토큰 만료/무효화(401·403): 로그인된 것처럼 보이지만 서버 데이터를 못 불러오는 상태.
+      // 조용히 게스트 데이터로 폴백하면 "로그인됐는데 전표가 안 보임"이 되므로, 세션을 정리하고 재로그인을 유도한다.
+      if (res.status === 401 || res.status === 403) {
+        clearAuthStorage();
+        sessionExpired = true;
       }
     } catch(e) {
       console.error('서버 데이터 로드 실패, 로컬 임시 데이터 사용:', e.message);
@@ -2539,18 +2553,24 @@ document.getElementById('authForm').onsubmit = async (e) => {
         localStorage.setItem('expense_user_email', data.email);
         localStorage.setItem('expense_user_name', data.name || '');
 
-        setTimeout(async () => {
-          closeAuthModal();
-          const localDataStr = localStorage.getItem(STORAGE_KEY);
-          const localData = localDataStr ? JSON.parse(localDataStr) : [];
-          
-          if (localData.length > 0) {
+        const localDataStr = localStorage.getItem(STORAGE_KEY);
+        const localData = localDataStr ? JSON.parse(localDataStr) : [];
+
+        if (localData.length > 0) {
+          // 게스트 데이터가 있으면 동기화 안내 (짧은 지연으로 성공 메시지만 잠깐 노출)
+          setTimeout(() => {
+            closeAuthModal();
             document.getElementById('syncCountText').textContent = `${localData.length}건`;
             document.getElementById('syncOverlay').classList.add('open');
-          } else {
-            location.reload();
-          }
-        }, 800);
+          }, 250);
+        } else {
+          // 전체 페이지 새로고침 대신 화면만 즉시 갱신해 로그인 후 대기 시간을 줄인다.
+          closeAuthModal();
+          updateAuthUI();
+          await loadEntries();
+          renderAll();
+          cleanupOldImages().catch(e=>console.error(e));
+        }
       } else {
         msgEl.classList.add('error');
         msgEl.textContent = data.error || '로그인에 실패했습니다.';
@@ -2844,6 +2864,13 @@ function renderAll(){renderCalendar();renderList();}
 async function init() {
   updateAuthUI();
   await loadEntries();
+  if (sessionExpired) {
+    updateAuthUI();          // 게스트 배지로 갱신
+    renderAll();
+    alert('세션이 만료되었습니다. 다시 로그인해주세요.');
+    openAuthModal();
+    return;
+  }
   renderAll();
   cleanupOldImages().catch(e=>console.error(e));
 }
