@@ -568,7 +568,12 @@
   <section id="erpContainer" class="card list-card" style="margin-bottom: 24px;">
     <div class="list-head" style="display:flex; justify-content:space-between; align-items:flex-start;">
       <div>
-        <h2 id="listTitleErp">분개전표입력</h2><span class="count" id="listCountErp"></span>
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <button class="nav-btn" id="listPrevBtn" title="이전 달" style="width:28px; height:28px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+          <span id="listMonthLabel" style="font-size:16px; font-weight:700; color:var(--ink); min-width:74px; text-align:center;"></span>
+          <button class="nav-btn" id="listNextBtn" title="다음 달" style="width:28px; height:28px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+        </div>
+        <span class="count" id="listCountErp"></span>
       </div>
       <div style="display: flex; gap: 6px; align-items: center;">
         <button class="nav-btn" onclick="newEntry()" title="수동 전표 추가" style="width:30px; height:30px; font-size:14px;">➕</button>
@@ -1143,7 +1148,7 @@ function renderList(){
   const tbodyErp=document.getElementById('tbodyErp');
   const tfootErp=document.getElementById('tfootErp');
   const emptyErp=document.getElementById('emptyStateErp');
-  document.getElementById('listTitleErp').textContent=`분개전표입력 (${label})`;
+  document.getElementById('listMonthLabel').textContent=label;
   document.getElementById('listCountErp').textContent=`${rows.length}건`;
   
   const lastDay = new Date(y, viewDate.getMonth() + 1, 0).getDate();
@@ -2209,8 +2214,12 @@ document.addEventListener('keydown',e=>{
 });
 
 /* ---- nav ---- */
-document.getElementById('prevBtn').onclick=()=>{viewDate.setMonth(viewDate.getMonth()-1);renderCalendar();};
-document.getElementById('nextBtn').onclick=()=>{viewDate.setMonth(viewDate.getMonth()+1);renderCalendar();};
+const goPrevMonth=()=>{viewDate.setMonth(viewDate.getMonth()-1);renderAll();};
+const goNextMonth=()=>{viewDate.setMonth(viewDate.getMonth()+1);renderAll();};
+document.getElementById('prevBtn').onclick=goPrevMonth;
+document.getElementById('nextBtn').onclick=goNextMonth;
+document.getElementById('listPrevBtn').onclick=goPrevMonth;
+document.getElementById('listNextBtn').onclick=goNextMonth;
 document.getElementById('todayBtn').onclick=()=>{viewDate=new Date();renderAll();};
 
 /* ---- View Tabs Toggle ---- */
