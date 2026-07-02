@@ -887,6 +887,17 @@
     </div>
   </div>
 
+  <!-- CONFIRM MODAL (공용 확인창 — 브라우저 기본 confirm 대체) -->
+  <div class="overlay" id="appConfirmOverlay" style="z-index: 90;">
+    <div class="modal card" style="max-width:320px; padding:24px;">
+      <p id="appConfirmMessage" style="font-size:15px; font-weight:600; color:var(--ink); line-height:1.55; margin-bottom:22px; text-align:center;"></p>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-ghost" id="appConfirmCancelBtn" style="flex:1; height:44px; background:var(--surface-2); color:var(--ink); border:none;">취소</button>
+        <button class="btn btn-primary" id="appConfirmOkBtn" style="flex:1; height:44px;">확인</button>
+      </div>
+    </div>
+  </div>
+
 <script>
 if (window.location.protocol === 'file:') {
   alert('이 페이지는 서버를 통해 실행해야 합니다. 터미널에서 서버를 실행한 뒤 (예: npm start) 브라우저에서 http://localhost:12345 (또는 설정한 포트)로 접속해주세요.');
@@ -2770,6 +2781,29 @@ document.getElementById('syncCancelBtn').onclick = () => {
   }
 };
 
+// 공용 확인 모달: 브라우저 기본 confirm()이 화면 상단에 뜨는 문제를 없애고 앱 디자인과 일치시킨다.
+function showConfirm(message, { okText = '확인', danger = false } = {}) {
+  return new Promise((resolve) => {
+    const overlay = document.getElementById('appConfirmOverlay');
+    const msgEl = document.getElementById('appConfirmMessage');
+    const okBtn = document.getElementById('appConfirmOkBtn');
+    const cancelBtn = document.getElementById('appConfirmCancelBtn');
+    msgEl.textContent = message;
+    okBtn.textContent = okText;
+    okBtn.style.background = danger ? 'var(--credit)' : '';
+    okBtn.style.borderColor = danger ? 'var(--credit)' : '';
+    const close = (result) => {
+      overlay.classList.remove('open');
+      okBtn.onclick = cancelBtn.onclick = overlay.onclick = null;
+      resolve(result);
+    };
+    okBtn.onclick = () => close(true);
+    cancelBtn.onclick = () => close(false);
+    overlay.onclick = (e) => { if (e.target === overlay) close(false); };
+    overlay.classList.add('open');
+  });
+}
+
 function updateAuthUI() {
   const container = document.getElementById('authStatusContainer');
   
@@ -2813,18 +2847,15 @@ function updateAuthUI() {
       }
     };
 
-    document.getElementById('modalLogoutBtn').onclick = () => {
-      if (confirm('로그아웃 하시겠습니까?')) {
-        localStorage.removeItem('expense_user_token');
-        localStorage.removeItem('expense_user_email');
-        localStorage.removeItem('expense_user_name');
-        localStorage.removeItem('expense_user_team');
+    document.getElementById('modalLogoutBtn').onclick = async () => {
+      if (await showConfirm('로그아웃 하시겠습니까?')) {
+        clearAuthStorage();
         location.reload();
       }
     };
 
     document.getElementById('modalDeleteAccountBtn').onclick = async () => {
-      if (confirm('정말로 회원 탈퇴를 하시겠습니까?\\n모든 전표 데이터와 영수증 이미지가 즉시 영구 삭제되며 복구할 수 없습니다.')) {
+      if (await showConfirm('정말로 회원 탈퇴를 하시겠습니까? 모든 전표 데이터와 영수증 이미지가 즉시 영구 삭제되며 복구할 수 없습니다.', { okText: '탈퇴', danger: true })) {
         try {
           const res = await fetch('/api/auth/me', {
             method: 'DELETE',
@@ -2832,10 +2863,7 @@ function updateAuthUI() {
           });
           if (res.ok) {
             alert('회원 탈퇴가 완료되었습니다.');
-            localStorage.removeItem('expense_user_token');
-            localStorage.removeItem('expense_user_email');
-            localStorage.removeItem('expense_user_name');
-            localStorage.removeItem('expense_user_team');
+            clearAuthStorage();
             location.reload();
           } else {
             const data = await res.json();
