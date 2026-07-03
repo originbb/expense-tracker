@@ -6,6 +6,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>영수증 스캔하면 끝! 초간단 전표 정리</title>
 <script>
+  // URL 쿼리 파라미터(?v=2 등) 자동 제거
+  if (window.location.search) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
   // 깜빡임 방지: 저장된 수동 테마를 렌더 전에 적용 (기본값은 라이트모드)
   (function(){var t=localStorage.getItem('expense_theme');
     if(t==='dark')document.documentElement.classList.add('theme-dark');})();
