@@ -775,7 +775,9 @@ app.post('/api/ocr', authenticateToken, async (req, res) => {
 });
 
 // 정적 파일 서빙: 프로젝트 루트 전체를 노출하지 않도록 특정 파일들만 명시적으로 서빙한다.
-const staticFiles = ['/favicon.jpg', '/app-icon.png', '/icon-192.png', '/icon-512.png', '/manifest.json'];
+// iOS Safari는 <link>와 별개로 루트의 /apple-touch-icon.png(및 -precomposed)를 관례적으로 직접 요청한다.
+// 목록에서 빠지면 catch-all이 index.html(HTML)을 이미지로 응답 → iOS 디코딩 실패 → 홈 화면 아이콘 미표시.
+const staticFiles = ['/favicon.jpg', '/app-icon.png', '/apple-touch-icon.png', '/apple-touch-icon-precomposed.png', '/icon-192.png', '/icon-512.png', '/manifest.json'];
 staticFiles.forEach(file => {
   app.get(file, (req, res) => res.sendFile(path.join(__dirname, file)));
 });
