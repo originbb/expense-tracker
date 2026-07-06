@@ -774,10 +774,10 @@ app.post('/api/ocr', authenticateToken, async (req, res) => {
   }
 });
 
-// 정적 파일 서빙: 프로젝트 루트 전체를 노출하지 않도록 index.html만 명시적으로 서빙한다.
-// (index.html은 외부 CDN/data URL만 사용하므로 별도 로컬 정적 자산이 없다.)
-app.get('/favicon.jpg', (req, res) => {
-  res.sendFile(path.join(__dirname, 'favicon.jpg'));
+// 정적 파일 서빙: 프로젝트 루트 전체를 노출하지 않도록 특정 파일들만 명시적으로 서빙한다.
+const staticFiles = ['/favicon.jpg', '/app-icon.png', '/icon-192.png', '/icon-512.png', '/manifest.json'];
+staticFiles.forEach(file => {
+  app.get(file, (req, res) => res.sendFile(path.join(__dirname, file)));
 });
 
 // 이렇게 하면 server.js / local.db / package.json 등 민감 파일이 정적으로 다운로드되는 것을 막는다.
