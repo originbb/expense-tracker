@@ -165,14 +165,6 @@
   .btn-ghost{background:var(--surface-2);border:1px solid var(--line);color:var(--ink);}
   .btn-ghost:hover{background:var(--surface-2);opacity:.85;}
 
-  /* export dropdown menu */
-  .export-menu{position:relative;z-index:40;}
-  #exportMenuBtn{background:var(--control-bg);border:1px solid var(--line-2);}
-  .export-dropdown{position:absolute;right:0;top:calc(100% + 6px);background:var(--glass-bg);-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);border:1px solid var(--glass-border);border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:6px;min-width:210px;display:none;z-index:30;}
-  .export-dropdown.open{display:block;animation:fade .14s ease;}
-  .export-item{display:block;width:100%;text-align:left;background:none;border:none;font-family:var(--font);font-size:14px;font-weight:500;color:var(--ink);padding:11px 12px;border-radius:8px;cursor:pointer;white-space:nowrap;}
-  .export-item:hover{background:var(--surface-2);}
-
   /* list */
   .list-card{overflow:hidden;}
   .list-head{display:flex;align-items:baseline;justify-content:space-between;padding:18px 22px 14px;border-bottom:1px solid var(--line);}
@@ -546,15 +538,9 @@
     <button class="btn btn-ghost" id="btnToggleCal" style="height: 32px; font-weight: 500; font-size: 13px; border: none; background: transparent; color: var(--ink-2); padding: 0 8px;">
       📅 달력 펼치기 ▼
     </button>
-    <div class="export-menu" id="exportMenu" style="position: relative;">
-      <button class="btn btn-ghost" id="exportMenuBtn" aria-haspopup="true" aria-expanded="false" style="height: 36px; font-weight: 600; font-size: 14px; border: 1px solid var(--line-2); background: #fff; color: var(--ink);">
-        📥 내보내기 <span style="font-size:11px;opacity:.7;">▾</span>
-      </button>
-      <div class="export-dropdown" id="exportDropdown">
-        <button class="export-item" id="exportBtn">📊 엑셀로 내보내기</button>
-        <button class="export-item" id="downloadZipBtn">🧾 해당월 영수증 다운로드</button>
-      </div>
-    </div>
+    <button class="btn btn-ghost" id="exportBtn" title="엑셀 + 영수증 이미지를 ZIP 하나로 다운로드" style="height: 36px; font-weight: 600; font-size: 14px; border: 1px solid var(--line-2); background: #fff; color: var(--ink);">
+      📥 내보내기
+    </button>
   </div>
 
   <!-- CALENDAR (Hidden by default) -->
@@ -856,19 +842,6 @@
           <button class="btn btn-ghost" id="syncCancelBtn" style="flex: 1;">삭제</button>
           <button class="btn btn-primary" id="syncConfirmBtn" style="flex: 2;">계정으로 동기화</button>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- EXPORT MODAL -->
-  <div class="overlay" id="exportModalOverlay" style="z-index: 65;">
-    <div class="modal card" style="max-width:320px; padding:24px;">
-      <h3 style="margin-bottom:16px; font-size:18px;">엑셀로 내보내기</h3>
-      <p style="margin-bottom:24px; font-size:14px; color:var(--ink-2); line-height:1.5;">어떤 내역을 엑셀로 다운로드하시겠습니까?</p>
-      <div style="display:flex; flex-direction:column; gap:10px;">
-        <button class="btn btn-primary" id="exportMonthBtn" style="width:100%; height:44px;"><span id="exportMonthLabel">해당 월</span> 다운로드</button>
-        <button class="btn btn-ghost" id="exportAllBtn" style="width:100%; height:44px; background:var(--surface-2); color:var(--ink); border:none;">전체 내역 다운로드</button>
-        <button class="btn btn-ghost" onclick="document.getElementById('exportModalOverlay').classList.remove('open')" style="width:100%; height:44px; margin-top:8px;">취소</button>
       </div>
     </div>
   </div>
@@ -1197,7 +1170,6 @@ function renderList(){
   const rows=filtered();
   const y=viewDate.getFullYear(),m=viewDate.getMonth()+1;
   const label=`${String(y).slice(2)}년 ${m}월`;
-  document.getElementById('downloadZipBtn').textContent=`${m}월 영수증 다운로드`;
 
   const td=rows.reduce((s,e)=>s+Number(e.debit||0),0);
 
@@ -2310,128 +2282,79 @@ document.getElementById('btnToggleCal').onclick = () => {
   }
 };
 
-/* ---- export & download ---- */
-const exportMenuBtn = document.getElementById('exportMenuBtn');
-const exportDropdown = document.getElementById('exportDropdown');
-if (exportMenuBtn) {
-  exportMenuBtn.onclick = (e) => {
-    e.stopPropagation();
-    exportDropdown.classList.toggle('open');
-    const isOpen = exportDropdown.classList.contains('open');
-    exportMenuBtn.setAttribute('aria-expanded', isOpen);
-  };
-  document.addEventListener('click', () => {
-    exportDropdown.classList.remove('open');
-    exportMenuBtn.setAttribute('aria-expanded', 'false');
+/* ---- export: 엑셀 + 영수증 이미지를 ZIP 하나로 즉시 다운로드 ---- */
+function buildMonthSheet(wb, ms, rows){
+  const sorted = rows.slice().sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
+  const aoa=[['행번호','계정과목','비용구분','차변금액','대변금액','적요','귀속부서','활동센터']];
+  sorted.forEach((e, i)=>{
+    const dArr = e.date.split('-');
+    const memoStr = `${dArr[0].slice(2)}.${dArr[1]}.${dArr[2]} ${e.memo||''}`.trim();
+    aoa.push([String(i+1).padStart(4, '0'), e.account, '', e.debit, e.credit, memoStr, e.department||'', e.department||'']);
   });
 }
 
-document.getElementById('downloadZipBtn').onclick=async()=>{
-  const rows=filtered();
-  if(rows.length===0){alert('다운로드할 전표가 없습니다.');return;}
-  
-  const btn = document.getElementById('downloadZipBtn');
-  const origText = btn.textContent;
-  btn.textContent = '압축 중...';
-  btn.disabled = true;
-  
+  const td=sorted.reduce((s,e)=>s+Number(e.debit||0),0);
+  aoa.push(['합계','미지급금-(직원경비)','','',td,'','','']);
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:10},{wch:26},{wch:10},{wch:12},{wch:12},{wch:34},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, ws, ms);
+const exportBtn = document.getElementById('exportBtn');
+exportBtn.onclick = async () => {
+  const rows = filtered();
+  if(rows.length === 0){ alert('해당 월에 내보낼 전표가 없습니다.'); return; }
+
+  const origHtml = exportBtn.innerHTML;
+  exportBtn.disabled = true;
+  exportBtn.textContent = '⏳ 엑셀 생성 중...';
+
   try {
-    await Promise.all([loadScriptOnce(CDN.jszip), loadScriptOnce(CDN.filesaver)]);
+    await Promise.all([loadScriptOnce(CDN.xlsx), loadScriptOnce(CDN.jszip), loadScriptOnce(CDN.filesaver)]);
+    const ms = monthStr();
     const zip = new JSZip();
     let imgCount = 0;
     const nameCount = {};  // 같은 날·같은 사용처 중복 시 번호 부여용
+
+    // 1) 전표 엑셀
+    const wb = XLSX.utils.book_new();
+    buildMonthSheet(wb, ms, rows);
+    zip.file(`전표_${ms}.xlsx`, XLSX.write(wb, {bookType:'xlsx', type:'array'}));
+
+    // 2) 영수증 원본 이미지
     // 로그인 시 파일명에 사용자 이름 포함 (날짜_이름_사용처)
     const userName = isLoggedIn() ? (localStorage.getItem('expense_user_name') || '').trim() : '';
     const safeName = userName.replace(/[\/\\:*?"<>|]/g, '_');
 
-    for(const e of rows){
+    for(let i = 0; i < rows.length; i++){
+      exportBtn.textContent = `⏳ 영수증 ${i+1}/${rows.length}`;
+      const e = rows[i];
       const dataUrl = await getImage(e.id);
-      if(dataUrl){
-        const base64Data = dataUrl.split(',')[1];
-        const vendorLabel = e.vendor || ACCOUNT_LABEL[e.account] || '알수없음';
-        const safeVendor = vendorLabel.replace(/[\/\\:*?"<>|]/g, '_');
-        const yymmdd = (e.date || '').slice(2).replace(/-/g, '');
-        const base = safeName ? `${yymmdd}_${safeName}_${safeVendor}` : `${yymmdd}_${safeVendor}`;
-        const n = (nameCount[base] = (nameCount[base] || 0) + 1);
-        const fileName = `${base}${n > 1 ? n : ''}.jpg`;
-        zip.file(fileName, base64Data, {base64: true});
-        imgCount++;
-      }
-    }
-    
-    if(imgCount === 0){
-      alert('저장된 영수증 이미지가 없습니다.');
-    } else {
-      const content = await zip.generateAsync({type:"blob"});
-      saveAs(content, `영수증_${monthStr()}.zip`);
+      if(!dataUrl) continue;
+      const base64Data = dataUrl.split(',')[1];
+      const mime = /^data:image\/([a-z0-9.+-]+);/i.exec(dataUrl);
+      let ext = (mime ? mime[1] : 'jpg').toLowerCase();
+      if(ext === 'jpeg') ext = 'jpg';
+      const vendorLabel = e.vendor || ACCOUNT_LABEL[e.account] || '알수없음';
+      const safeVendor = vendorLabel.replace(/[\/\\:*?"<>|]/g, '_');
+      const yymmdd = (e.date || '').slice(2).replace(/-/g, '');
+      const base = safeName ? `${yymmdd}_${safeName}_${safeVendor}` : `${yymmdd}_${safeVendor}`;
+      const n = (nameCount[base] = (nameCount[base] || 0) + 1);
+      zip.file(`영수증/${base}${n > 1 ? n : ''}.${ext}`, base64Data, {base64: true});
+      imgCount++;
     }
   } catch(err){
     console.error(err.message);
-    alert('ZIP 생성 중 오류가 발생했습니다.');
+
+    exportBtn.textContent = '⏳ 압축 중...';
+    const content = await zip.generateAsync({type:'blob'});
+    saveAs(content, `전표_${ms}.zip`);
+
+    if(imgCount === 0) alert('저장된 영수증 이미지가 없어 엑셀만 압축했습니다.');
+    alert('내보내기 중 오류가 발생했습니다.');
   } finally {
-    btn.textContent = origText;
-    btn.disabled = false;
+    exportBtn.disabled = false;
+    exportBtn.innerHTML = origHtml;
   }
 };
-
-document.getElementById('exportBtn').onclick=()=>{
-  const y = viewDate.getFullYear();
-  const m = viewDate.getMonth() + 1;
-  const label = `${y}년 ${m}월`;
-  document.getElementById('exportMonthLabel').textContent = label;
-  document.getElementById('exportModalOverlay').classList.add('open');
-};
-
-async function performExport(range) {
-  let exportData = {};
-  
-  if(range === 'month') {
-    const rows = filtered();
-    if(rows.length === 0){
-      alert('해당 월에 내보낼 전표가 없습니다.');
-      document.getElementById('exportModalOverlay').classList.remove('open');
-      return;
-    }
-    exportData[monthStr()] = rows;
-  } else {
-    if(entries.length === 0){
-      alert('내보낼 전표가 없습니다.');
-      document.getElementById('exportModalOverlay').classList.remove('open');
-      return;
-    }
-    entries.forEach(e => {
-      const ms = e.date.substring(0, 7);
-      if(!exportData[ms]) exportData[ms] = [];
-      exportData[ms].push(e);
-    });
-  }
-
-  await loadScriptOnce(CDN.xlsx);
-  const wb = XLSX.utils.book_new();
-  const months = Object.keys(exportData).sort();
-  
-  months.forEach(ms => {
-    const rows = exportData[ms].sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
-    const aoa=[['행번호','계정과목','비용구분','차변금액','대변금액','적요','귀속부서','활동센터']];
-    rows.forEach((e, i)=>{
-      const dArr = e.date.split('-');
-      const memoStr = `${dArr[0].slice(2)}.${dArr[1]}.${dArr[2]} ${e.memo||''}`.trim();
-      aoa.push([String(i+1).padStart(4, '0'), e.account, '', e.debit, e.credit, memoStr, e.department||'', e.department||'']);
-    });
-    const td=rows.reduce((s,e)=>s+Number(e.debit||0),0);
-    aoa.push(['합계','미지급금-(직원경비)','','',td,'','','']);
-    const ws=XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols']=[{wch:10},{wch:26},{wch:10},{wch:12},{wch:12},{wch:34},{wch:16}];
-    XLSX.utils.book_append_sheet(wb, ws, ms);
-  });
-
-  const fn = range === 'month' ? `전표_${monthStr()}.xlsx` : `전표_전체.xlsx`;
-  XLSX.writeFile(wb, fn);
-  document.getElementById('exportModalOverlay').classList.remove('open');
-}
-
-document.getElementById('exportMonthBtn').onclick = () => performExport('month');
-document.getElementById('exportAllBtn').onclick = () => performExport('all');
 
 /* --- 회원 가입 / 로그인 관련 인터랙션 제어 --- */
 let authMode = 'login';
