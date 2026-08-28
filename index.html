@@ -661,7 +661,7 @@
   </div><!-- /.split-layout -->
 
   <div style="margin-top:24px; text-align:left; font-size:12.5px; color:var(--ink-2); line-height:1.5; padding: 0 4px; margin-bottom: 24px;">
-    ⚠️ <strong style="color:var(--ink);">안내</strong>: 영수증 원본 이미지는 <strong style="color:var(--ink);">해당 월 종료 30일 이후 자동 삭제</strong>됩니다. 증빙 자료 보관이 필요하신 경우 반드시 사전에 엑셀 및 영수증 다운로드 기능을 통해 백업해 주세요.
+    ⚠️ <strong style="color:var(--ink);">안내</strong>: 영수증 원본 이미지는 <strong style="color:var(--ink);">해당 월 종료 <span id="retentionDaysText">90</span>일 이후 자동 삭제</strong>됩니다. 증빙 자료 보관이 필요하신 경우 반드시 사전에 엑셀 및 영수증 다운로드 기능을 통해 백업해 주세요.
   </div>
 
 </div><!-- /.wrap : 모달 오버레이는 body 직속으로 분리해 fixed 위치/stacking 보장 -->
@@ -938,6 +938,9 @@ function setLoading(btn, isLoading, text) {
 }
 
 const STORAGE_KEY='expense_ledger_v4';
+// 영수증 원본 이미지 보관 기간(해당 월 종료일 기준). server.js의 RETENTION_DAYS와 반드시 동일하게 유지한다.
+const RETENTION_DAYS = 90;
+const RETENTION_MS = RETENTION_DAYS * 24 * 60 * 60 * 1000;
 const won=n=>Number(n||0).toLocaleString('ko-KR');
 const pad=n=>String(n).padStart(2,'0');
 // 저장형 XSS 방지: innerHTML 템플릿에 사용자 입력을 넣기 전 HTML 특수문자를 이스케이프한다.
@@ -1793,7 +1796,7 @@ async function renameImage(oldId, newId) {
   }
 }
 
-// 30일 경과한 오래된 영수증 자동 삭제 (IndexedDB 클린업)
+// 보관기간(RETENTION_DAYS) 경과한 오래된 영수증 자동 삭제 (IndexedDB 클린업)
 async function cleanupOldImages() {
   try {
     const db = await initDB();
@@ -1803,33 +1806,32 @@ async function cleanupOldImages() {
     let deletedCount = 0;
     const now = Date.now();
     
-    // 1. 전표 데이터 기준 (해당 월 종료일 + 30일 경과)
+    // 1. 전표 데이터 기준 (해당 월 종료일 + RETENTION_DAYS 경과)
     if (typeof entries !== 'undefined' && Array.isArray(entries)) {
       entries.forEach(e => {
         if (!e.date) return;
         const [yyyy, mm] = e.date.split('-');
         const monthEnd = new Date(yyyy, mm, 0).getTime();
-        const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-        if (now > monthEnd + thirtyDaysMs) {
+        if (now > monthEnd + RETENTION_MS) {
           store.delete(isNaN(e.id) ? e.id : Number(e.id));
           deletedCount++;
         }
       });
     }
 
-    // 2. 과거 게스트 데이터 등 (타임스탬프 키 기준 30일 경과)
-    const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+    // 2. 과거 게스트 데이터 등 (타임스탬프 키 기준 RETENTION_DAYS 경과)
+    const cutoff = now - RETENTION_MS;
     const req = store.openCursor();
     req.onsuccess = (ev) => {
       const cursor = ev.target.result;
       if (cursor) {
-        if (typeof cursor.key === 'number' && cursor.key > 1000000000000 && cursor.key < thirtyDaysAgo) {
+        if (typeof cursor.key === 'number' && cursor.key > 1000000000000 && cursor.key < cutoff) {
           cursor.delete();
           deletedCount++;
         }
         cursor.continue();
       } else if (deletedCount > 0) {
-        console.log(`🧹 30일 경과 영수증 이미지 자동 삭제 완료`);
+        console.log(`🧹 ${RETENTION_DAYS}일 경과 영수증 이미지 자동 삭제 완료`);
       }
     };
   } catch (e) {
@@ -2291,13 +2293,13 @@ function buildMonthSheet(wb, ms, rows){
     const memoStr = `${dArr[0].slice(2)}.${dArr[1]}.${dArr[2]} ${e.memo||''}`.trim();
     aoa.push([String(i+1).padStart(4, '0'), e.account, '', e.debit, e.credit, memoStr, e.department||'', e.department||'']);
   });
-}
-
   const td=sorted.reduce((s,e)=>s+Number(e.debit||0),0);
   aoa.push(['합계','미지급금-(직원경비)','','',td,'','','']);
   const ws=XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols']=[{wch:10},{wch:26},{wch:10},{wch:12},{wch:12},{wch:34},{wch:16}];
   XLSX.utils.book_append_sheet(wb, ws, ms);
+}
+
 const exportBtn = document.getElementById('exportBtn');
 exportBtn.onclick = async () => {
   const rows = filtered();
@@ -2311,8 +2313,6 @@ exportBtn.onclick = async () => {
     await Promise.all([loadScriptOnce(CDN.xlsx), loadScriptOnce(CDN.jszip), loadScriptOnce(CDN.filesaver)]);
     const ms = monthStr();
     const zip = new JSZip();
-    let imgCount = 0;
-    const nameCount = {};  // 같은 날·같은 사용처 중복 시 번호 부여용
 
     // 1) 전표 엑셀
     const wb = XLSX.utils.book_new();
@@ -2320,6 +2320,8 @@ exportBtn.onclick = async () => {
     zip.file(`전표_${ms}.xlsx`, XLSX.write(wb, {bookType:'xlsx', type:'array'}));
 
     // 2) 영수증 원본 이미지
+    let imgCount = 0;
+    const nameCount = {};  // 같은 날·같은 사용처 중복 시 번호 부여용
     // 로그인 시 파일명에 사용자 이름 포함 (날짜_이름_사용처)
     const userName = isLoggedIn() ? (localStorage.getItem('expense_user_name') || '').trim() : '';
     const safeName = userName.replace(/[\/\\:*?"<>|]/g, '_');
@@ -2341,14 +2343,14 @@ exportBtn.onclick = async () => {
       zip.file(`영수증/${base}${n > 1 ? n : ''}.${ext}`, base64Data, {base64: true});
       imgCount++;
     }
-  } catch(err){
-    console.error(err.message);
 
     exportBtn.textContent = '⏳ 압축 중...';
     const content = await zip.generateAsync({type:'blob'});
     saveAs(content, `전표_${ms}.zip`);
 
     if(imgCount === 0) alert('저장된 영수증 이미지가 없어 엑셀만 압축했습니다.');
+  } catch(err){
+    console.error(err.message);
     alert('내보내기 중 오류가 발생했습니다.');
   } finally {
     exportBtn.disabled = false;
@@ -2838,6 +2840,8 @@ async function init() {
 }
 
 document.getElementById('fDate').value=ymd(new Date());
+// 안내 문구의 보관 기간은 상수에서 생성해 값 변경 시 문구 누락을 막는다.
+document.getElementById('retentionDaysText').textContent = RETENTION_DAYS;
 init();
 </script>
 </body>

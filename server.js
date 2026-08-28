@@ -17,6 +17,8 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 10000;
+// 영수증 원본 이미지 보관 기간(해당 월 종료일 기준). 클라이언트(index.html)의 RETENTION_DAYS와 반드시 동일하게 유지한다.
+const RETENTION_DAYS = 90;
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   console.error('❌ 치명적 오류: JWT_SECRET 환경변수가 설정되지 않았습니다. 서버를 종료합니다.');
@@ -212,19 +214,19 @@ initDb().then(() => {
   console.error('❌ 데이터베이스 초기화 실패:', err);
 });
 
-// --- 서버 스토리지 30일 경과 자동 삭제 로직 ---
+// --- 서버 스토리지 보관기간(RETENTION_DAYS) 경과 자동 삭제 로직 ---
 async function cleanupServerImages() {
   try {
     const sql = `
       DELETE FROM receipt_images 
       WHERE expense_id IN (
         SELECT id FROM expenses 
-        WHERE date(date, 'start of month', '+1 month', '-1 day', '+30 days') < date('now')
+        WHERE date(date, 'start of month', '+1 month', '-1 day', '+${RETENTION_DAYS} days') < date('now')
       )
     `;
     const res = await db.execute(sql);
     if (res.rowsAffected > 0) {
-      console.log(`🧹 서버 자동 삭제: 30일 경과 영수증 이미지 ${res.rowsAffected}개 삭제 완료`);
+      console.log(`🧹 서버 자동 삭제: ${RETENTION_DAYS}일 경과 영수증 이미지 ${res.rowsAffected}개 삭제 완료`);
     }
   } catch (err) {
     console.error('서버 영수증 이미지 자동 정리 실패:', err);
