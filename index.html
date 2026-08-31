@@ -165,6 +165,19 @@
   .btn-ghost{background:var(--surface-2);border:1px solid var(--line);color:var(--ink);}
   .btn-ghost:hover{background:var(--surface-2);opacity:.85;}
 
+  /* trash — 휴지통 */
+  .trash-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;margin-left:6px;
+    padding:0 5px;border-radius:9px;background:var(--credit);color:#fff;font-size:11px;font-weight:700;line-height:1;}
+  .trash-body{max-height:min(52vh,420px);overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius);}
+  .trash-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);}
+  .trash-item:last-child{border-bottom:none;}
+  .trash-info{flex:1;min-width:0;}
+  .trash-title{font-size:14px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .trash-sub{font-size:12.5px;color:var(--ink-2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .trash-left{font-size:11.5px;color:var(--credit);margin-top:3px;font-weight:600;}
+  .trash-act{flex:none;display:flex;gap:6px;}
+  .trash-empty{padding:32px 16px;text-align:center;font-size:14px;color:var(--ink-2);line-height:1.7;}
+
   /* undo toast — 삭제 직후 되돌리기 (#saveState는 모바일에서 숨겨지므로 별도 표면이 필요) */
   .undo-toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,0);z-index:80;display:none;align-items:center;gap:14px;
     background:var(--glass-bg);-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);
@@ -409,6 +422,9 @@
     .modal-close{width:44px;height:44px;font-size:19px;}
     .btn{height:44px;}
     #undoBtn{min-height:44px;padding:11px 20px;}
+    .trash-item{flex-direction:column;align-items:stretch;gap:8px;}
+    .trash-act{justify-content:flex-end;}
+    .trash-act .btn{height:40px !important;}
     .undo-toast{bottom:16px;left:16px;right:16px;transform:none;justify-content:space-between;max-width:none;}
     @keyframes undoIn{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
     .field input,.field select{height:46px;}
@@ -554,6 +570,9 @@
     <button class="btn btn-ghost" id="btnToggleCal" style="height: 32px; font-weight: 500; font-size: 13px; border: none; background: transparent; color: var(--ink-2); padding: 0 8px;">
       📅 달력 펼치기 ▼
     </button>
+    <button class="btn btn-ghost" id="trashBtn" title="삭제한 전표 복원" style="position:relative; height: 36px; font-weight: 600; font-size: 14px; border: 1px solid var(--line-2); background: #fff; color: var(--ink);">
+      🗑️ 휴지통<span id="trashBadge" class="trash-badge" style="display:none;"></span>
+    </button>
     <button class="btn btn-ghost" id="exportBtn" title="엑셀 + 영수증 이미지를 ZIP 하나로 다운로드" style="height: 36px; font-weight: 600; font-size: 14px; border: 1px solid var(--line-2); background: #fff; color: var(--ink);">
       📥 내보내기
     </button>
@@ -692,6 +711,24 @@
       <div class="modal-body" style="padding:18px 20px 20px">
         <button class="btn btn-primary" id="dayAddBtn" style="width:100%;height:42px;margin-bottom:14px">+ 이 날짜에 전표 추가</button>
         <div id="dayList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRASH MODAL -->
+  <div class="overlay" id="trashOverlay" style="z-index: 66;">
+    <div class="modal card" style="max-width:520px; padding:24px;">
+      <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:6px;">
+        <h3 style="font-size:18px;">🗑️ 휴지통</h3>
+        <span class="muted" id="trashCountText" style="font-size:13px;"></span>
+      </div>
+      <p class="muted" style="margin-bottom:16px; font-size:13px; line-height:1.5;">
+        삭제한 전표는 <strong style="color:var(--ink);"><span id="trashDaysText">30</span>일간</strong> 보관되며, 그 이후 영수증까지 영구 파기됩니다.
+      </p>
+      <div id="trashBody" class="trash-body"></div>
+      <div style="display:flex; gap:8px; margin-top:16px;">
+        <button class="btn btn-ghost" id="trashEmptyBtn" style="flex:1; height:44px; color:var(--credit);">휴지통 비우기</button>
+        <button class="btn btn-ghost" id="trashCloseBtn" style="flex:1; height:44px; background:var(--surface-2); color:var(--ink); border:none;">닫기</button>
       </div>
     </div>
   </div>
@@ -963,6 +1000,8 @@ const STORAGE_KEY='expense_ledger_v4';
 // 영수증 원본 이미지 보관 기간(해당 월 종료일 기준). server.js의 RETENTION_DAYS와 반드시 동일하게 유지한다.
 const RETENTION_DAYS = 90;
 const RETENTION_MS = RETENTION_DAYS * 24 * 60 * 60 * 1000;
+// 휴지통 보관 기간. server.js의 TRASH_DAYS와 반드시 동일하게 유지한다.
+const TRASH_DAYS = 30;
 const won=n=>Number(n||0).toLocaleString('ko-KR');
 const pad=n=>String(n).padStart(2,'0');
 // 저장형 XSS 방지: innerHTML 템플릿에 사용자 입력을 넣기 전 HTML 특수문자를 이스케이프한다.
@@ -1284,30 +1323,133 @@ function renderList(){
   });
 }
 
-/* ---- 삭제 되돌리기 (undo) ----
-   삭제 직후 UNDO_WINDOW_MS 동안만 스냅샷을 들고 있다가 원래대로 복원한다.
-   회원 모드는 서버에 재삽입하므로 id가 새로 발급된다(화면에 노출되지 않는 값). */
+/* ---- 휴지통 + 삭제 되돌리기 ----
+   삭제는 즉시 파기가 아니라 휴지통 이동이다. 회원은 서버 deleted_at,
+   게스트는 TRASH_KEY(localStorage)에 보관하고 영수증 이미지는 그대로 남긴다.
+   되돌리기 토스트는 '방금 실수'용 빠른 경로일 뿐이고, 시간이 지난 뒤에는
+   휴지통에서 TRASH_DAYS 동안 복원할 수 있다. */
+const TRASH_KEY = 'expense_trash_v1';
 const UNDO_WINDOW_MS = 10000;
-let undoSnapshot = null;   // [{entry, dataUrl}] — base64 이미지를 들고 있어 창이 닫히면 즉시 버린다
+let undoSnapshot = null;   // 되돌릴 전표 id 목록 (실제 데이터는 휴지통에 있다)
 let undoHideTimer = null;
 
-// 반드시 삭제 '전에' 호출해야 한다. 삭제 후에는 서버·IndexedDB에서 이미지가 사라진다.
-async function captureForUndo(rows, onProgress){
-  const items = [];
-  for(let i = 0; i < rows.length; i++){
-    if(onProgress) onProgress(i + 1, rows.length);
-    let dataUrl = null;
-    try { dataUrl = await getImage(rows[i].id); } catch(err){ console.error(err.message); }
-    items.push({ entry: {...rows[i]}, dataUrl });
-  }
-  return items;
+function loadTrash(){
+  try { const r = localStorage.getItem(TRASH_KEY); return r ? JSON.parse(r) : []; }
+  catch(e){ return []; }
+}
+function saveTrash(list){
+  try { localStorage.setItem(TRASH_KEY, JSON.stringify(list)); } catch(e){ console.error(e.message); }
 }
 
-function showUndoToast(items){
-  if(!items || items.length === 0) return;
-  undoSnapshot = items;
+// 남은 보관 일수 (0이면 오늘 파기 예정)
+function trashDaysLeft(deletedAt){
+  const t = new Date(String(deletedAt).replace(' ', 'T') + (String(deletedAt).endsWith('Z') ? '' : 'Z')).getTime();
+  if(isNaN(t)) return TRASH_DAYS;
+  return Math.max(0, TRASH_DAYS - Math.floor((Date.now() - t) / 86400000));
+}
+
+// 게스트 휴지통에서 보관 기간이 지난 항목을 영구 파기한다 (회원은 서버가 처리)
+async function purgeGuestTrash(){
+  if(isLoggedIn()) return;
+  const list = loadTrash();
+  const keep = [], drop = [];
+  list.forEach(it => (trashDaysLeft(it.deletedAt) > 0 ? keep : drop).push(it));
+  if(drop.length === 0) return;
+  for(const it of drop){ try { await deleteImage(it.id); } catch(e){} }
+  saveTrash(keep);
+  console.log(`🗑️ 휴지통 영구 파기: ${TRASH_DAYS}일 경과 전표 ${drop.length}건`);
+}
+
+// 게스트 → 회원 전환 시 게스트 휴지통을 정리한다. 로그인 후에는 서버 휴지통을
+// 보므로 남겨두면 화면에서 접근할 수 없는 잔여 데이터가 된다.
+async function discardGuestTrash(){
+  const list = loadTrash();
+  for(const it of list){ try { await deleteImage(it.id); } catch(e){} }
+  try { localStorage.removeItem(TRASH_KEY); } catch(e){}
+}
+
+async function fetchTrash(){
+  if(isLoggedIn()){
+    try {
+      const res = await fetch('/api/expenses/trash', { headers: getHeaders() });
+      if(res.ok) return await res.json();
+    } catch(e){ console.error(e.message); }
+    return [];
+  }
+  return loadTrash().slice().sort((a,b)=>String(b.deletedAt).localeCompare(String(a.deletedAt)));
+}
+
+// 전표를 휴지통으로 보낸다. 영수증 이미지는 지우지 않는다(복원 대비).
+async function moveToTrash(rows){
+  const ids = rows.map(r => String(r.id));
+  if(isLoggedIn()){
+    for(const id of ids){
+      const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE', headers: getHeaders() });
+      if(!res.ok){
+        const err = await res.json().catch(()=>({}));
+        throw new Error(err.error || '삭제 실패');
+      }
+    }
+  } else {
+    const stamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const trash = loadTrash();
+    rows.forEach(r => trash.push({ ...r, deletedAt: stamp }));
+    saveTrash(trash);
+  }
+  entries = entries.filter(x => !ids.includes(String(x.id)));
+  if(!isLoggedIn()) localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  return ids;
+}
+
+// 휴지통에서 복원한다. id와 영수증이 그대로라 원래 상태로 돌아간다.
+async function restoreFromTrash(ids){
+  let restored = 0, failed = 0;
+  if(isLoggedIn()){
+    for(const id of ids){
+      try {
+        const res = await fetch(`/api/expenses/${id}/restore`, { method: 'POST', headers: getHeaders() });
+        if(!res.ok){ failed++; continue; }
+        entries.push(await res.json());
+        restored++;
+      } catch(err){ console.error(err.message); failed++; }
+    }
+  } else {
+    const trash = loadTrash(), keep = [];
+    trash.forEach(it => {
+      if(ids.includes(String(it.id))){
+        const { deletedAt, ...entry } = it;
+        entries.push(entry);
+        restored++;
+      } else keep.push(it);
+    });
+    failed = ids.length - restored;
+    saveTrash(keep);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+  }
+  renderAll();
+  if(document.getElementById('dayOverlay').classList.contains('open')) renderDayModal();
+  return { restored, failed };
+}
+
+// 휴지통에서 영구 삭제 (영수증 이미지까지)
+async function purgeFromTrash(ids){
+  if(isLoggedIn()){
+    for(const id of ids){
+      try { await fetch(`/api/expenses/${id}/purge`, { method: 'DELETE', headers: getHeaders() }); }
+      catch(err){ console.error(err.message); }
+    }
+  } else {
+    saveTrash(loadTrash().filter(it => !ids.includes(String(it.id))));
+  }
+  for(const id of ids){ try { await deleteImage(id); } catch(e){} }
+}
+
+/* ---- 되돌리기 토스트 ---- */
+function showUndoToast(ids){
+  if(!ids || ids.length === 0) return;
+  undoSnapshot = ids;
   document.getElementById('undoToastText').textContent =
-    items.length > 1 ? `전표 ${items.length}건을 삭제했습니다.` : '전표를 삭제했습니다.';
+    ids.length > 1 ? `전표 ${ids.length}건을 휴지통으로 옮겼습니다.` : '전표를 휴지통으로 옮겼습니다.';
   const btn = document.getElementById('undoBtn');
   btn.disabled = false;
   btn.textContent = '되돌리기';
@@ -1324,37 +1466,13 @@ function hideUndoToast(){
 
 async function undoDelete(){
   if(!undoSnapshot) return;
-  const items = undoSnapshot;
+  const ids = undoSnapshot;
   const btn = document.getElementById('undoBtn');
   btn.disabled = true;
+  btn.textContent = '복원 중...';
   clearTimeout(undoHideTimer);
-
-  let restored = 0, failed = 0;
   try {
-    for(let i = 0; i < items.length; i++){
-      btn.textContent = items.length > 1 ? `복원 중 ${i+1}/${items.length}` : '복원 중...';
-      const { entry, dataUrl } = items[i];
-      try {
-        if(isLoggedIn()){
-          const res = await fetch('/api/expenses', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...getHeaders() },
-            body: JSON.stringify(entry)
-          });
-          if(!res.ok){ failed++; continue; }
-          const saved = await res.json();
-          entries.push(saved);
-          if(dataUrl) await saveImage(saved.id, dataUrl);
-        } else {
-          entries.push({...entry});
-          if(dataUrl) await saveImage(entry.id, dataUrl);
-        }
-        restored++;
-      } catch(err){ console.error(err.message); failed++; }
-    }
-    if(!isLoggedIn()) localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-    renderAll();
-    if(document.getElementById('dayOverlay').classList.contains('open')) renderDayModal();
+    const { restored, failed } = await restoreFromTrash(ids);
     flashSave(failed ? '일부 복원 실패' : '복원됨');
     if(failed) alert(`${restored}건을 복원했지만 ${failed}건은 복원하지 못했습니다.`);
   } finally {
@@ -1362,6 +1480,85 @@ async function undoDelete(){
   }
 }
 document.getElementById('undoBtn').onclick = undoDelete;
+
+/* ---- 휴지통 화면 ---- */
+async function openTrash(){
+  document.getElementById('trashOverlay').classList.add('open');
+  await renderTrash();
+}
+function closeTrash(){
+  document.getElementById('trashOverlay').classList.remove('open');
+}
+
+async function renderTrash(){
+  const body = document.getElementById('trashBody');
+  const emptyBtn = document.getElementById('trashEmptyBtn');
+  body.innerHTML = '<div class="trash-empty">불러오는 중…</div>';
+  const list = await fetchTrash();
+  document.getElementById('trashCountText').textContent = `${list.length}건`;
+  emptyBtn.style.display = list.length ? '' : 'none';
+
+  if(list.length === 0){
+    body.innerHTML = `<div class="trash-empty">휴지통이 비어 있습니다.<br><span class="muted">삭제한 전표는 ${TRASH_DAYS}일간 여기 보관됩니다.</span></div>`;
+    return;
+  }
+
+  body.innerHTML = list.map(it => {
+    const left = trashDaysLeft(it.deletedAt);
+    const label = it.vendor || ACCOUNT_LABEL[it.account] || it.account;
+    return `
+    <div class="trash-item">
+      <div class="trash-info">
+        <div class="trash-title">${escapeHtml(it.date)} · ${escapeHtml(label)}</div>
+        <div class="trash-sub">${won(it.debit)}원 · ${escapeHtml(it.memo || '')}</div>
+        <div class="trash-left">${left === 0 ? '오늘 파기 예정' : `${left}일 후 파기`}</div>
+      </div>
+      <div class="trash-act">
+        <button class="btn btn-primary trash-restore" data-restore="${it.id}" style="height:34px;padding:0 14px;font-size:13px;">복원</button>
+        <button class="btn btn-ghost trash-purge" data-purge="${it.id}" style="height:34px;padding:0 12px;font-size:13px;color:var(--credit);">영구삭제</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  body.querySelectorAll('[data-restore]').forEach(b => b.onclick = async () => {
+    b.disabled = true; b.textContent = '복원 중';
+    const { failed } = await restoreFromTrash([String(b.dataset.restore)]);
+    flashSave(failed ? '복원 실패' : '복원됨');
+    await renderTrash();
+    updateTrashBadge();
+  });
+  body.querySelectorAll('[data-purge]').forEach(b => b.onclick = async () => {
+    if(!confirm('이 전표와 영수증을 영구 삭제할까요?\n이 작업은 되돌릴 수 없습니다.')) return;
+    b.disabled = true;
+    await purgeFromTrash([String(b.dataset.purge)]);
+    flashSave('영구 삭제됨');
+    await renderTrash();
+    updateTrashBadge();
+  });
+}
+
+async function updateTrashBadge(){
+  const badge = document.getElementById('trashBadge');
+  if(!badge) return;
+  const list = await fetchTrash();
+  badge.textContent = list.length ? String(list.length) : '';
+  badge.style.display = list.length ? '' : 'none';
+}
+
+document.getElementById('trashBtn').onclick = openTrash;
+document.getElementById('trashCloseBtn').onclick = closeTrash;
+document.getElementById('trashOverlay').addEventListener('click', e => {
+  if(e.target.id === 'trashOverlay') closeTrash();
+});
+document.getElementById('trashEmptyBtn').onclick = async () => {
+  const list = await fetchTrash();
+  if(list.length === 0) return;
+  if(!confirm(`휴지통의 전표 ${list.length}건과 영수증을 모두 영구 삭제할까요?\n이 작업은 되돌릴 수 없습니다.`)) return;
+  await purgeFromTrash(list.map(it => String(it.id)));
+  flashSave('휴지통을 비웠습니다');
+  await renderTrash();
+  updateTrashBadge();
+};
 
 /* ---- add / edit ---- */
 let pendingDeleteId=null;
@@ -1380,40 +1577,22 @@ document.getElementById('confirmDelete').onclick=async()=>{
   if(pendingDeleteId!=null){
     const confirmBtn = document.getElementById('confirmDelete');
     const target = entries.find(x => String(x.id) === String(pendingDeleteId));
+    if(!target){ closeConfirm(); return; }
     setIconBtnLoading(confirmBtn, true);
     flashSave('삭제 중…');
     try {
-      // 되돌리기용 스냅샷은 이미지가 지워지기 전에 확보해야 한다.
-      const snapshot = target ? await captureForUndo([target]) : [];
-      if (isLoggedIn()) {
-        const res = await fetch(`/api/expenses/${pendingDeleteId}`, {
-          method: 'DELETE',
-          headers: getHeaders()
-        });
-        if (res.ok) {
-          entries = entries.filter(x => String(x.id) !== String(pendingDeleteId));
-          flashSave('삭제됨');
-        } else {
-          const errData = await res.json();
-          alert(`삭제 실패: ${errData.error || '알 수 없는 오류'}`);
-          flashSave('삭제 실패');
-          closeConfirm();
-          return;
-        }
-      } else {
-        entries = entries.filter(x => String(x.id) !== String(pendingDeleteId));
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-        flashSave('삭제됨');
-      }
+      // 즉시 파기가 아니라 휴지통으로 옮긴다. 영수증 이미지는 복원을 위해 남겨둔다.
+      const ids = await moveToTrash([target]);
+      flashSave('휴지통으로 이동');
       renderAll();
       if (document.getElementById('dayOverlay').classList.contains('open')) renderDayModal();
       if (String(currentReceiptViewId) === String(pendingDeleteId)) resetReceiptViewer();
-      deleteImage(pendingDeleteId).catch(e => console.error(e.message));
-      showUndoToast(snapshot);
+      showUndoToast(ids);
+      updateTrashBadge();
       closeConfirm();
     } catch (err) {
       console.error(err.message);
-      alert('서버 통신 오류가 발생했습니다.');
+      alert(`삭제 실패: ${err.message}`);
       flashSave('삭제 실패');
       closeConfirm();
     } finally {
@@ -1427,30 +1606,19 @@ document.getElementById('deleteAllBtn').onclick = async () => {
   if (rows.length === 0) { alert('삭제할 전표가 없습니다.'); return; }
   const y = viewDate.getFullYear();
   const m = viewDate.getMonth() + 1;
-  if (!confirm(`현재 월(${y}년 ${m}월)의 전표 ${rows.length}건을 모두 삭제하시겠습니까?\n삭제 직후 ${UNDO_WINDOW_MS / 1000}초 안에는 되돌릴 수 있습니다.`)) return;
+  if (!confirm(`현재 월(${y}년 ${m}월)의 전표 ${rows.length}건을 모두 휴지통으로 옮기시겠습니까?\n휴지통에서 ${TRASH_DAYS}일간 복원할 수 있습니다.`)) return;
 
   const deleteAllBtn = document.getElementById('deleteAllBtn');
   setIconBtnLoading(deleteAllBtn, true);
+  flashSave('휴지통으로 이동 중...');
 
   try {
-    // 되돌리기용 스냅샷은 이미지가 지워지기 전에 확보해야 한다.
-    const snapshot = await captureForUndo(rows, (i, n) => flashSave(`준비 중 ${i}/${n}`));
-    flashSave('일괄 삭제 중...');
-    const rowIds = rows.map(r => String(r.id));
-    if (isLoggedIn()) {
-      for (const id of rowIds) {
-        await fetch(`/api/expenses/${id}`, { method: 'DELETE', headers: getHeaders() });
-      }
-    }
-    entries = entries.filter(x => !rowIds.includes(String(x.id)));
-    if (!isLoggedIn()) localStorage.setItem(STORAGE_KEY,JSON.stringify(entries));
-    for (const id of rowIds) {
-      deleteImage(id).catch(e=>console.error(e.message));
-    }
-    flashSave('삭제 완료');
+    const ids = await moveToTrash(rows);
+    flashSave('휴지통으로 이동');
     resetReceiptViewer();
     renderAll();
-    showUndoToast(snapshot);
+    showUndoToast(ids);
+    updateTrashBadge();
   } catch (err) {
     console.error(err);
     alert('삭제 중 오류가 발생했습니다.');
@@ -2802,6 +2970,7 @@ document.getElementById('syncConfirmBtn').onclick = async () => {
       });
       if (res.ok) {
         localStorage.removeItem(STORAGE_KEY);
+        await discardGuestTrash();
         alert('로컬 데이터 동기화 완료!');
       } else {
         const data = await res.json();
@@ -2821,8 +2990,10 @@ document.getElementById('syncConfirmBtn').onclick = async () => {
 document.getElementById('syncCancelBtn').onclick = () => {
   if (confirm('동기화하지 않으면 기존 로컬 데이터는 영구히 삭제됩니다. 정말 삭제하시겠습니까?')) {
     localStorage.removeItem(STORAGE_KEY);
-    document.getElementById('syncOverlay').classList.remove('open');
-    location.reload();
+    discardGuestTrash().finally(() => {
+      document.getElementById('syncOverlay').classList.remove('open');
+      location.reload();
+    });
   }
 };
 
@@ -2946,11 +3117,13 @@ async function init() {
   }
   renderAll();
   cleanupOldImages().catch(e=>console.error(e));
+  purgeGuestTrash().then(updateTrashBadge).catch(e=>console.error(e));
 }
 
 document.getElementById('fDate').value=ymd(new Date());
 // 안내 문구의 보관 기간은 상수에서 생성해 값 변경 시 문구 누락을 막는다.
 document.getElementById('retentionDaysText').textContent = RETENTION_DAYS;
+document.getElementById('trashDaysText').textContent = TRASH_DAYS;
 init();
 </script>
 </body>

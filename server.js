@@ -19,6 +19,8 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 // 영수증 원본 이미지 보관 기간(해당 월 종료일 기준). 클라이언트(index.html)의 RETENTION_DAYS와 반드시 동일하게 유지한다.
 const RETENTION_DAYS = 90;
+// 휴지통 보관 기간. 이 기간이 지난 삭제 전표는 영구 파기된다. 클라이언트의 TRASH_DAYS와 동일하게 유지한다.
+const TRASH_DAYS = 30;
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   console.error('❌ 치명적 오류: JWT_SECRET 환경변수가 설정되지 않았습니다. 서버를 종료합니다.');
@@ -164,6 +166,8 @@ async function initDb() {
   // expenses 테이블 생성 이후에 추가 컬럼을 보강 (신규 DB에서도 컬럼이 누락되지 않도록 순서 보장)
   try { await db.execute("ALTER TABLE expenses ADD COLUMN department TEXT"); } catch(e) {}
   try { await db.execute("ALTER TABLE expenses ADD COLUMN employeeName TEXT"); } catch(e) {}
+  // 휴지통: 삭제는 즉시 파기가 아니라 시각 기록(soft delete)으로 처리한다. NULL이면 정상 전표.
+  try { await db.execute("ALTER TABLE expenses ADD COLUMN deleted_at TEXT"); } catch(e) {}
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS receipt_images (
@@ -227,6 +231,14 @@ async function cleanupServerImages() {
     const res = await db.execute(sql);
     if (res.rowsAffected > 0) {
       console.log(`🧹 서버 자동 삭제: ${RETENTION_DAYS}일 경과 영수증 이미지 ${res.rowsAffected}개 삭제 완료`);
+    }
+
+    // 휴지통 보관 기간이 지난 전표는 영수증까지 영구 파기한다 (receipt_images는 CASCADE)
+    const purged = await db.execute(
+      `DELETE FROM expenses WHERE deleted_at IS NOT NULL AND deleted_at < datetime('now', '-${TRASH_DAYS} days')`
+    );
+    if (purged.rowsAffected > 0) {
+      console.log(`🗑️ 휴지통 영구 파기: ${TRASH_DAYS}일 경과 전표 ${purged.rowsAffected}건`);
     }
   } catch (err) {
     console.error('서버 영수증 이미지 자동 정리 실패:', err);
@@ -515,7 +527,7 @@ app.put('/api/auth/profile', authenticateToken, async (req, res) => {
 app.get('/api/expenses', authenticateToken, async (req, res) => {
   try {
     const result = await db.execute({
-      sql: 'SELECT id, date, account, debit, credit, memo, vendor, department, employeeName FROM expenses WHERE user_id = ? ORDER BY date ASC, id ASC',
+      sql: 'SELECT id, date, account, debit, credit, memo, vendor, department, employeeName FROM expenses WHERE user_id = ? AND deleted_at IS NULL ORDER BY date ASC, id ASC',
       args: [req.user.id]
     });
     const list = result.rows.map(row => ({
@@ -563,7 +575,7 @@ app.put('/api/expenses/:id', authenticateToken, async (req, res) => {
 
   try {
     const check = await db.execute({
-      sql: 'SELECT id FROM expenses WHERE id = ? AND user_id = ?',
+      sql: 'SELECT id FROM expenses WHERE id = ? AND user_id = ? AND deleted_at IS NULL',
       args: [id, req.user.id]
     });
     if (check.rows.length === 0) {
@@ -581,22 +593,96 @@ app.put('/api/expenses/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// 지출 내역 삭제
+// 휴지통 조회 (:id 라우트보다 먼저 선언해 경로가 가로채이지 않게 한다)
+app.get('/api/expenses/trash', authenticateToken, async (req, res) => {
+  try {
+    const result = await db.execute({
+      sql: `SELECT id, date, account, debit, credit, memo, vendor, department, employeeName, deleted_at
+            FROM expenses WHERE user_id = ? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC`,
+      args: [req.user.id]
+    });
+    res.json(result.rows.map(row => ({
+      id: row.id,
+      date: row.date,
+      account: row.account,
+      debit: Number(row.debit || 0),
+      credit: Number(row.credit || 0),
+      memo: row.memo || '',
+      vendor: row.vendor || '',
+      department: row.department || '',
+      employeeName: row.employeeName || '',
+      deletedAt: row.deleted_at
+    })));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '휴지통 조회 중 오류가 발생했습니다.' });
+  }
+});
+
+// 지출 내역 삭제 — 즉시 파기하지 않고 휴지통으로 보낸다(soft delete)
 app.delete('/api/expenses/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
 
   try {
     const result = await db.execute({
-      sql: 'DELETE FROM expenses WHERE id = ? AND user_id = ?',
+      sql: "UPDATE expenses SET deleted_at = datetime('now') WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
       args: [id, req.user.id]
     });
     if (result.rowsAffected === 0) {
       return res.status(404).json({ error: '해당 지출 내역을 찾을 수 없거나 권한이 없습니다.' });
     }
-    res.json({ success: true });
+    res.json({ success: true, trashed: true });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: '삭제 중 오류가 발생했습니다.' });
+  }
+});
+
+// 휴지통에서 복원 — id와 영수증이 그대로 남아 있어 원래 상태로 되돌아간다
+app.post('/api/expenses/:id/restore', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await db.execute({
+      sql: 'UPDATE expenses SET deleted_at = NULL WHERE id = ? AND user_id = ? AND deleted_at IS NOT NULL',
+      args: [id, req.user.id]
+    });
+    if (result.rowsAffected === 0) {
+      return res.status(404).json({ error: '복원할 전표를 찾을 수 없습니다. 보관 기간이 지나 파기되었을 수 있습니다.' });
+    }
+    const row = await db.execute({
+      sql: 'SELECT id, date, account, debit, credit, memo, vendor, department, employeeName FROM expenses WHERE id = ? AND user_id = ?',
+      args: [id, req.user.id]
+    });
+    const e = row.rows[0];
+    res.json({
+      id: e.id, date: e.date, account: e.account,
+      debit: Number(e.debit || 0), credit: Number(e.credit || 0),
+      memo: e.memo || '', vendor: e.vendor || '',
+      department: e.department || '', employeeName: e.employeeName || ''
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '복원 중 오류가 발생했습니다.' });
+  }
+});
+
+// 휴지통에서 영구 삭제 (단건, 또는 body.all=true 로 비우기)
+app.delete('/api/expenses/:id/purge', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await db.execute({
+      sql: 'DELETE FROM expenses WHERE id = ? AND user_id = ? AND deleted_at IS NOT NULL',
+      args: [id, req.user.id]
+    });
+    if (result.rowsAffected === 0) {
+      return res.status(404).json({ error: '해당 전표를 찾을 수 없습니다.' });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '영구 삭제 중 오류가 발생했습니다.' });
   }
 });
 
