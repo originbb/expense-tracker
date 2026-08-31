@@ -1229,7 +1229,7 @@ function renderList(){
       </tr>`;
     }).join('');
     tfootErp.innerHTML=`<tr class="erp-total-row" style="cursor:pointer;">
-      <td class="muted">합계</td>
+      <td class="muted">${String(rows.length+1).padStart(4, '0')}</td>
       <td class="lbl">미지급금-(직원경비)</td>
       <td class="r muted"></td>
       <td class="r" style="color:var(--credit)">${won(td)}</td>
@@ -1263,7 +1263,7 @@ function renderList(){
         
         // 미지급금 클릭 시 하단 박스 항목 변경
         const userName = isLoggedIn() ? (localStorage.getItem('expense_user_name') || '사원명 입력') : '사원명 입력';
-        document.getElementById('previewVendor').value = '본사 여의도';
+        document.getElementById('previewVendor').value = '코나아이';
         document.getElementById('previewName').value = userName;
         const pf = document.getElementById('previewProof');
         if(pf) pf.value = ''; // 증빙 없음
@@ -2402,7 +2402,8 @@ function buildMonthSheet(wb, ms, rows){
     aoa.push([String(i+1).padStart(4, '0'), e.account, '', e.debit, e.credit, memoStr, e.department||'', e.department||'']);
   });
   const td=sorted.reduce((s,e)=>s+Number(e.debit||0),0);
-  aoa.push(['합계','미지급금-(직원경비)','','',td,'','','']);
+  // 미지급금(대변)도 ERP 업로드 양식에 맞춰 전표 행에 이어지는 행번호를 부여한다.
+  aoa.push([String(sorted.length+1).padStart(4, '0'),'미지급금-(직원경비)','','',td,'','','']);
   const ws=XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols']=[{wch:10},{wch:26},{wch:10},{wch:12},{wch:12},{wch:34},{wch:16}];
   XLSX.utils.book_append_sheet(wb, ws, ms);
