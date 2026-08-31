@@ -166,8 +166,6 @@
   .btn-ghost:hover{background:var(--surface-2);opacity:.85;}
 
   /* trash — 휴지통 */
-  .trash-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;margin-left:6px;
-    padding:0 5px;border-radius:9px;background:var(--credit);color:#fff;font-size:11px;font-weight:700;line-height:1;}
   .trash-body{max-height:min(52vh,420px);overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius);}
   .trash-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);}
   .trash-item:last-child{border-bottom:none;}
@@ -570,8 +568,8 @@
     <button class="btn btn-ghost" id="btnToggleCal" style="height: 32px; font-weight: 500; font-size: 13px; border: none; background: transparent; color: var(--ink-2); padding: 0 8px;">
       📅 달력 펼치기 ▼
     </button>
-    <button class="btn btn-ghost" id="trashBtn" title="삭제한 전표 복원" style="position:relative; height: 36px; font-weight: 600; font-size: 14px; border: 1px solid var(--line-2); background: #fff; color: var(--ink);">
-      🗑️ 휴지통<span id="trashBadge" class="trash-badge" style="display:none;"></span>
+    <button class="btn btn-ghost" id="trashBtn" title="삭제한 전표 복원" style="height: 36px; font-weight: 600; font-size: 14px; border: 1px solid var(--line-2); background: #fff; color: var(--ink);">
+      🗑️ 휴지통
     </button>
     <button class="btn btn-ghost" id="exportBtn" title="엑셀 + 영수증 이미지를 ZIP 하나로 다운로드" style="height: 36px; font-weight: 600; font-size: 14px; border: 1px solid var(--line-2); background: #fff; color: var(--ink);">
       📥 내보내기
@@ -1525,7 +1523,6 @@ async function renderTrash(){
     const { failed } = await restoreFromTrash([String(b.dataset.restore)]);
     flashSave(failed ? '복원 실패' : '복원됨');
     await renderTrash();
-    updateTrashBadge();
   });
   body.querySelectorAll('[data-purge]').forEach(b => b.onclick = async () => {
     if(!confirm('이 전표와 영수증을 영구 삭제할까요?\n이 작업은 되돌릴 수 없습니다.')) return;
@@ -1533,16 +1530,7 @@ async function renderTrash(){
     await purgeFromTrash([String(b.dataset.purge)]);
     flashSave('영구 삭제됨');
     await renderTrash();
-    updateTrashBadge();
   });
-}
-
-async function updateTrashBadge(){
-  const badge = document.getElementById('trashBadge');
-  if(!badge) return;
-  const list = await fetchTrash();
-  badge.textContent = list.length ? String(list.length) : '';
-  badge.style.display = list.length ? '' : 'none';
 }
 
 document.getElementById('trashBtn').onclick = openTrash;
@@ -1557,7 +1545,6 @@ document.getElementById('trashEmptyBtn').onclick = async () => {
   await purgeFromTrash(list.map(it => String(it.id)));
   flashSave('휴지통을 비웠습니다');
   await renderTrash();
-  updateTrashBadge();
 };
 
 /* ---- add / edit ---- */
@@ -1588,7 +1575,6 @@ document.getElementById('confirmDelete').onclick=async()=>{
       if (document.getElementById('dayOverlay').classList.contains('open')) renderDayModal();
       if (String(currentReceiptViewId) === String(pendingDeleteId)) resetReceiptViewer();
       showUndoToast(ids);
-      updateTrashBadge();
       closeConfirm();
     } catch (err) {
       console.error(err.message);
@@ -1618,7 +1604,6 @@ document.getElementById('deleteAllBtn').onclick = async () => {
     resetReceiptViewer();
     renderAll();
     showUndoToast(ids);
-    updateTrashBadge();
   } catch (err) {
     console.error(err);
     alert('삭제 중 오류가 발생했습니다.');
@@ -3117,7 +3102,7 @@ async function init() {
   }
   renderAll();
   cleanupOldImages().catch(e=>console.error(e));
-  purgeGuestTrash().then(updateTrashBadge).catch(e=>console.error(e));
+  purgeGuestTrash().catch(e=>console.error(e));
 }
 
 document.getElementById('fDate').value=ymd(new Date());
