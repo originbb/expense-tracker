@@ -236,6 +236,16 @@ test('영수증 스캔 잠금이 finally에서 해제된다', async () => {
   assert.match(fn, /finally\s*\{[\s\S]*receiptBtn\.disabled\s*=\s*false/, '버튼 활성화가 finally 안에 없다');
 });
 
+test('저장 버튼에 재진입 가드가 걸려 있다', async () => {
+  // 가드가 없으면 응답이 늦을 때 연타로 같은 전표가 두 건 등록되고,
+  // pendingReceiptImageId를 두 호출이 함께 읽어 영수증이 한쪽에만 붙는다.
+  const html = await (await fetch(BASE + '/')).text();
+  const fn = html.slice(html.indexOf('async function runSubmit'), html.indexOf("document.getElementById('addBtn').onclick"));
+  assert.match(fn, /if\(savingEntry\)return;\s*savingEntry=true;/, '진입 가드가 없다');
+  assert.match(fn, /addBtn\.disabled=true;\s*contBtn\.disabled=true;/, '두 버튼을 함께 잠그지 않는다');
+  assert.match(fn, /finally\s*\{[\s\S]*savingEntry=false/, '가드 해제가 finally 안에 없다');
+});
+
 test('서비스워커가 자바스크립트로 서빙된다', async () => {
   const res = await fetch(BASE + '/sw.js');
   assert.equal(res.status, 200);
