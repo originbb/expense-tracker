@@ -3110,6 +3110,15 @@ document.getElementById('fDate').value=ymd(new Date());
 document.getElementById('retentionDaysText').textContent = RETENTION_DAYS;
 document.getElementById('trashDaysText').textContent = TRASH_DAYS;
 init();
+
+// 오프라인 지원: 앱 셸을 캐싱해 신호가 약한 곳에서도 앱이 열리게 한다.
+// 지원하지 않는 브라우저에서는 등록만 건너뛰고 기존과 동일하게 동작한다.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .catch(e => console.error('서비스워커 등록 실패:', e.message));
+  });
+}
 </script>
 </body>
 </html>

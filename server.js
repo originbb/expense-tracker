@@ -862,6 +862,14 @@ app.post('/api/ocr', authenticateToken, async (req, res) => {
   }
 });
 
+// 서비스워커는 스코프가 '/'가 되도록 루트에서 서빙한다.
+// 캐시를 막아야 새 버전이 즉시 반영된다(서비스워커가 옛 버전에 갇히면 배포가 먹히지 않는다).
+app.get('/sw.js', (req, res) => {
+  res.set('Cache-Control', 'no-cache');
+  res.type('application/javascript');
+  res.sendFile(path.join(__dirname, 'sw.js'));
+});
+
 // 정적 파일 서빙: 프로젝트 루트 전체를 노출하지 않도록 특정 파일들만 명시적으로 서빙한다.
 // iOS Safari는 <link>와 별개로 루트의 /apple-touch-icon.png(및 -precomposed)를 관례적으로 직접 요청한다.
 // 목록에서 빠지면 catch-all이 index.html(HTML)을 이미지로 응답 → iOS 디코딩 실패 → 홈 화면 아이콘 미표시.
