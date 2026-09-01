@@ -230,8 +230,8 @@ test('존재하지 않는 API 경로는 404 JSON을 돌려준다', async () => {
 
 test('영수증 스캔 잠금이 finally에서 해제된다', async () => {
   // 잠금 해제가 finally 밖에 있으면 예외 한 번에 스캔 버튼이 새로고침 전까지 잠긴다.
-  const html = await (await fetch(BASE + '/')).text();
-  const fn = html.slice(html.indexOf('async function fillFromReceipt'), html.indexOf('async function runReceiptScan'));
+  const js = await (await fetch(BASE + '/app.js')).text();
+  const fn = js.slice(js.indexOf('async function fillFromReceipt'), js.indexOf('async function runReceiptScan'));
   assert.match(fn, /finally\s*\{[\s\S]*receiptBusy\s*=\s*false/, 'receiptBusy 해제가 finally 안에 없다');
   assert.match(fn, /finally\s*\{[\s\S]*receiptBtn\.disabled\s*=\s*false/, '버튼 활성화가 finally 안에 없다');
 });
@@ -239,11 +239,33 @@ test('영수증 스캔 잠금이 finally에서 해제된다', async () => {
 test('저장 버튼에 재진입 가드가 걸려 있다', async () => {
   // 가드가 없으면 응답이 늦을 때 연타로 같은 전표가 두 건 등록되고,
   // pendingReceiptImageId를 두 호출이 함께 읽어 영수증이 한쪽에만 붙는다.
-  const html = await (await fetch(BASE + '/')).text();
-  const fn = html.slice(html.indexOf('async function runSubmit'), html.indexOf("document.getElementById('addBtn').onclick"));
+  const js = await (await fetch(BASE + '/app.js')).text();
+  const fn = js.slice(js.indexOf('async function runSubmit'), js.indexOf("document.getElementById('addBtn').onclick"));
   assert.match(fn, /if\(savingEntry\)return;\s*savingEntry=true;/, '진입 가드가 없다');
   assert.match(fn, /addBtn\.disabled=true;\s*contBtn\.disabled=true;/, '두 버튼을 함께 잠그지 않는다');
   assert.match(fn, /finally\s*\{[\s\S]*savingEntry=false/, '가드 해제가 finally 안에 없다');
+});
+
+test('분리된 app.js / styles.css가 올바른 타입으로 서빙된다', async () => {
+  // staticFiles 허용 목록에서 빠지면 catch-all이 index.html(HTML)을 대신 응답한다.
+  // 브라우저는 이를 조용히 무시해 스타일이 빠지거나 앱이 아예 뜨지 않는다.
+  const cases = [['/app.js', /javascript/, /addEventListener|function/], ['/styles.css', /text\/css/, /:root/]];
+  for (const [path, type, content] of cases) {
+    const res = await fetch(BASE + path);
+    assert.equal(res.status, 200, path);
+    assert.match(res.headers.get('content-type') || '', type, `${path} content-type`);
+    const body = await res.text();
+    assert.ok(!body.startsWith('<!DOCTYPE'), `${path}가 index.html로 응답됐다 (staticFiles 누락)`);
+    assert.match(body, content, `${path} 내용`);
+  }
+});
+
+test('서비스워커 셸에 app.js와 styles.css가 포함된다', async () => {
+  // 빠지면 오프라인에서 껍데기만 뜨고 앱이 죽는다.
+  const sw = await (await fetch(BASE + '/sw.js')).text();
+  const shell = sw.slice(sw.indexOf('const SHELL'), sw.indexOf('];', sw.indexOf('const SHELL')));
+  assert.match(shell, /'\/app\.js'/, 'SHELL에 app.js가 없다');
+  assert.match(shell, /'\/styles\.css'/, 'SHELL에 styles.css가 없다');
 });
 
 test('서비스워커가 자바스크립트로 서빙된다', async () => {

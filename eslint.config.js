@@ -53,9 +53,9 @@ const bugRules = {
 export default [
   { ignores: ['node_modules/**', '.playwright-mcp/**', 'test.cjs'] },
 
-  // 브라우저에서 도는 코드 (index.html 인라인 스크립트)
+  // 브라우저에서 도는 코드 (app.js와 index.html에 남은 인라인 스크립트)
   {
-    files: ['index.html'],
+    files: ['app.js', 'index.html'],
     plugins: { html },
     languageOptions: {
       ecmaVersion: 2023,

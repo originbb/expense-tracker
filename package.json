@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node --dns-result-order=ipv4first server.js",
     "test": "node --test \"test/**/*.test.js\"",
-    "lint": "eslint server.js sw.js test/ index.html"
+    "lint": "eslint server.js sw.js app.js test/ index.html"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
