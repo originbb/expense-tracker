@@ -961,6 +961,12 @@ staticFiles.forEach(file => {
   app.get(file, (req, res) => res.sendFile(path.join(__dirname, file)));
 });
 
+// API 경로는 catch-all보다 먼저 404 JSON으로 끊는다.
+// 그렇지 않으면 /api 오타가 index.html(HTML 200)로 응답돼 클라이언트 버그를 찾기 어렵다.
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: '존재하지 않는 API 경로입니다.' });
+});
+
 // 이렇게 하면 server.js / local.db / package.json 등 민감 파일이 정적으로 다운로드되는 것을 막는다.
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));

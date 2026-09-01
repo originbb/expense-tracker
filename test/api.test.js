@@ -220,6 +220,22 @@ test('휴지통에 있는 전표는 수정할 수 없다', async () => {
   assert.equal(put.status, 404);
 });
 
+test('존재하지 않는 API 경로는 404 JSON을 돌려준다', async () => {
+  // catch-all이 가로채면 index.html(HTML 200)이 와서 클라이언트 버그를 찾기 어려워진다.
+  const res = await api('/api/expense', { auth: token });   // 오타를 흉내낸 경로
+  assert.equal(res.status, 404);
+  assert.ok(res.json, 'HTML이 반환되었다 (catch-all이 가로챔)');
+  assert.match(res.json.error, /존재하지 않는/);
+});
+
+test('영수증 스캔 잠금이 finally에서 해제된다', async () => {
+  // 잠금 해제가 finally 밖에 있으면 예외 한 번에 스캔 버튼이 새로고침 전까지 잠긴다.
+  const html = await (await fetch(BASE + '/')).text();
+  const fn = html.slice(html.indexOf('async function fillFromReceipt'), html.indexOf('async function runReceiptScan'));
+  assert.match(fn, /finally\s*\{[\s\S]*receiptBusy\s*=\s*false/, 'receiptBusy 해제가 finally 안에 없다');
+  assert.match(fn, /finally\s*\{[\s\S]*receiptBtn\.disabled\s*=\s*false/, '버튼 활성화가 finally 안에 없다');
+});
+
 test('서비스워커가 자바스크립트로 서빙된다', async () => {
   const res = await fetch(BASE + '/sw.js');
   assert.equal(res.status, 200);

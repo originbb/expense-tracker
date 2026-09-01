@@ -2299,7 +2299,25 @@ async function fillFromReceipt(files){
   receiptBusy=true;
   receiptBtn.disabled=true;
   ocrProgress.style.display='block';
-  
+
+  try {
+    await runReceiptScan(files);
+  } catch(err) {
+    // 잠금이 걸린 채로 조용히 끝나면 사용자는 이유를 알 수 없다.
+    console.error('영수증 처리 오류:', err.message);
+    await showAlert('영수증 처리 중 오류가 발생했습니다. 다시 시도해주세요.');
+  } finally {
+    // 반드시 finally에서 푼다. 여기서 놓치면 예외 한 번에 스캔 버튼이
+    // 새로고침 전까지 잠겨 영수증을 아예 못 찍는다.
+    receiptBusy=false;
+    receiptBtn.disabled=false;
+    receiptBtn.textContent='📷 여러 장의 영수증 일괄 스캔';
+    setTimeout(()=>{ocrProgress.style.display='none';ocrBar.style.width='0%';},600);
+  }
+}
+
+// fillFromReceipt의 본문. 잠금 해제를 호출부의 finally에 맡기기 위해 분리했다.
+async function runReceiptScan(files){
   let successCount=0;
   for(let i=0; i<files.length; i++){
     const file = files[i];
@@ -2398,11 +2416,6 @@ async function fillFromReceipt(files){
     renderAll();
     await showAlert(`${successCount}장의 영수증이 등록되었습니다. 목록에서 적요를 마저 채워주세요.`);
   }
-  
-  receiptBusy=false;
-  receiptBtn.disabled=false;
-  receiptBtn.textContent='📷 여러 장의 영수증 일괄 스캔';
-  setTimeout(()=>{ocrProgress.style.display='none';ocrBar.style.width='0%';},600);
 }
 
 /* ---- receipt fullscreen zoom/pan ---- */
