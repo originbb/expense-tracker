@@ -21,6 +21,8 @@ const PORT = process.env.PORT || 10000;
 const RETENTION_DAYS = 90;
 // 휴지통 보관 기간. 이 기간이 지난 삭제 전표는 영구 파기된다. 클라이언트의 TRASH_DAYS와 동일하게 유지한다.
 const TRASH_DAYS = 30;
+// 일괄 요청 1회에 처리할 수 있는 전표 수 상한. 한 달치를 한 번에 담고도 남는다.
+const MAX_BULK_IDS = 500;
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   console.error('❌ 치명적 오류: JWT_SECRET 환경변수가 설정되지 않았습니다. 서버를 종료합니다.');
@@ -616,6 +618,87 @@ app.get('/api/expenses/trash', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: '휴지통 조회 중 오류가 발생했습니다.' });
+  }
+});
+
+// 일괄 처리 공용 헬퍼. 건당 왕복하던 것을 요청 1회로 줄인다.
+// id 배열을 그대로 SQL에 넣지 않고 플레이스홀더로 바인딩한다.
+function parseBulkIds(body) {
+  const ids = body && body.ids;
+  if (!Array.isArray(ids) || ids.length === 0) return { error: '처리할 전표 id 목록이 필요합니다.' };
+  if (ids.length > MAX_BULK_IDS) return { error: `한 번에 최대 ${MAX_BULK_IDS}건까지 처리할 수 있습니다.` };
+  const nums = ids.map(Number).filter(n => Number.isInteger(n) && n > 0);
+  if (nums.length !== ids.length) return { error: '유효하지 않은 전표 id가 포함되어 있습니다.' };
+  return { ids: nums };
+}
+
+// 일괄 삭제 (휴지통으로 이동)
+app.post('/api/expenses/bulk-delete', authenticateToken, async (req, res) => {
+  const parsed = parseBulkIds(req.body);
+  if (parsed.error) return res.status(400).json({ error: parsed.error });
+
+  try {
+    const holes = parsed.ids.map(() => '?').join(',');
+    const result = await db.execute({
+      sql: `UPDATE expenses SET deleted_at = datetime('now')
+            WHERE user_id = ? AND deleted_at IS NULL AND id IN (${holes})`,
+      args: [req.user.id, ...parsed.ids]
+    });
+    res.json({ success: true, affected: result.rowsAffected });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '삭제 중 오류가 발생했습니다.' });
+  }
+});
+
+// 일괄 복원
+app.post('/api/expenses/bulk-restore', authenticateToken, async (req, res) => {
+  const parsed = parseBulkIds(req.body);
+  if (parsed.error) return res.status(400).json({ error: parsed.error });
+
+  try {
+    const holes = parsed.ids.map(() => '?').join(',');
+    await db.execute({
+      sql: `UPDATE expenses SET deleted_at = NULL
+            WHERE user_id = ? AND deleted_at IS NOT NULL AND id IN (${holes})`,
+      args: [req.user.id, ...parsed.ids]
+    });
+    // 복원된 전표를 그대로 돌려줘 클라이언트가 재조회 없이 목록에 넣을 수 있게 한다.
+    const rows = await db.execute({
+      sql: `SELECT id, date, account, debit, credit, memo, vendor, department, employeeName
+            FROM expenses WHERE user_id = ? AND deleted_at IS NULL AND id IN (${holes})`,
+      args: [req.user.id, ...parsed.ids]
+    });
+    res.json({
+      success: true,
+      restored: rows.rows.map(e => ({
+        id: e.id, date: e.date, account: e.account,
+        debit: Number(e.debit || 0), credit: Number(e.credit || 0),
+        memo: e.memo || '', vendor: e.vendor || '',
+        department: e.department || '', employeeName: e.employeeName || ''
+      }))
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '복원 중 오류가 발생했습니다.' });
+  }
+});
+
+// 일괄 영구 삭제 (휴지통에 있는 것만)
+app.post('/api/expenses/bulk-purge', authenticateToken, async (req, res) => {
+  const parsed = parseBulkIds(req.body);
+  if (parsed.error) return res.status(400).json({ error: parsed.error });
+
+  try {
+    const holes = parsed.ids.map(() => '?').join(',');
+    const result = await db.execute({
+      sql: `DELETE FROM expenses WHERE user_id = ? AND deleted_at IS NOT NULL AND id IN (${holes})`,
+      args: [req.user.id, ...parsed.ids]
+    });
+    res.json({ success: true, affected: result.rowsAffected });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: '영구 삭제 중 오류가 발생했습니다.' });
   }
 });
 
