@@ -6,3 +6,4 @@ node_modules
 .claude
 *.db
 *.log
+test-api.db*
