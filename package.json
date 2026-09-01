@@ -6,7 +6,8 @@
   "description": "경비 전표 장부 + 영수증 자동 입력 (Claude 비전 API 프록시)",
   "scripts": {
     "start": "node --dns-result-order=ipv4first server.js",
-    "test": "node --test \"test/**/*.test.js\""
+    "test": "node --test \"test/**/*.test.js\"",
+    "lint": "eslint server.js sw.js test/ index.html"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
@@ -16,5 +17,9 @@
     "express-rate-limit": "^8.5.2",
     "helmet": "^8.2.0",
     "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "eslint": "^10.9.1",
+    "eslint-plugin-html": "^8.2.0"
   }
 }

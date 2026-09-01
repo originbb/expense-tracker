@@ -1211,7 +1211,7 @@ async function showReceiptInViewer(id) {
     if (dataUrl) {
       viewer.innerHTML = `<img src="${dataUrl}" alt="영수증 원본">`;
       const img = viewer.querySelector('img');
-      if (img) img.onclick = () => openZoom(dataUrl);
+      if (img) img.onclick = () => window.openZoom(dataUrl);
     } else {
       viewer.innerHTML = `
         <div class="receipt-placeholder">
@@ -2242,6 +2242,10 @@ function resizeImageForSave(file, maxChars = 4_500_000) {
 
 const ocrProgress=document.getElementById('ocrProgress');
 const ocrBar=document.getElementById('ocrBar');
+// id가 자동으로 전역이 되는 브라우저 동작에 기대지 않고 명시적으로 잡는다.
+// 그 동작에 기대면 id를 바꿨을 때 경고 없이 런타임에서만 깨진다.
+const receiptBtn=document.getElementById('receiptBtn');
+const receiptFile=document.getElementById('receiptFile');
 
 // Tesseract 워커: 고정밀(best) 한국어 모델 사용. 한 번 만들어 재사용(모델은 브라우저에 캐시됨)
 let ocrWorker=null, ocrWorkerLoading=null;
@@ -2421,12 +2425,15 @@ async function fillFromReceipt(files){
   function reset(){ scale = 1; tx = 0; ty = 0; img.style.transform = ''; }
   function animate(on){ img.classList.toggle('animating', on); }
 
-  window.openZoom = function(src){
+  function openZoom(src){
     img.src = src; reset(); overlay.classList.add('open');
-  };
-  window.closeZoom = function(){
+  }
+  function closeZoom(){
     overlay.classList.remove('open'); img.src = ''; reset();
-  };
+  }
+  // IIFE 밖(전표 목록의 영수증 클릭)에서도 호출하므로 전역으로 노출한다.
+  window.openZoom = openZoom;
+  window.closeZoom = closeZoom;
 
   document.getElementById('zoomClose').onclick = () => closeZoom();
 
@@ -2518,7 +2525,7 @@ async function fillFromReceipt(files){
 
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape')return;
-  if(document.getElementById('receiptZoomOverlay').classList.contains('open')){closeZoom();return;}
+  if(document.getElementById('receiptZoomOverlay').classList.contains('open')){window.closeZoom();return;}
   if(document.getElementById('confirmOverlay').classList.contains('open')){closeConfirm();return;}
   if(document.getElementById('overlay').classList.contains('open')){closeModal();return;}
   if(document.getElementById('dayOverlay').classList.contains('open')){closeDayModal();return;}
