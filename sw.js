@@ -3,7 +3,7 @@
    최소한 앱 셸은 네트워크 없이 떠야 하고, 게스트 모드는 IndexedDB라 그 상태로 입력까지 된다.
 
    캐시 이름을 바꾸면 이전 캐시는 activate에서 모두 삭제된다. */
-const CACHE = 'expense-shell-v2';
+const CACHE = 'expense-shell-v3';
 
 // 앱 셸. 이것만 있으면 오프라인에서 화면이 뜬다.
 // 무거운 라이브러리(xlsx/tesseract/jszip)는 외부 CDN에서 사용 시점에 지연 로드되므로 여기 없다.
