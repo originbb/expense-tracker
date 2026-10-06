@@ -1682,20 +1682,20 @@ document.getElementById('btnToggleCal').onclick = () => {
 /* ---- export: 엑셀 + 영수증 이미지를 ZIP 하나로 즉시 다운로드 ---- */
 function buildMonthSheet(wb, ms, rows){
   const sorted = rows.slice().sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
-  // 회계일은 지출한 달의 말일이다. 기존 열 순서(ERP 업로드 양식)를 건드리지 않도록 맨 뒤에 둔다.
+  // 회계일은 지출한 달의 말일이다. ERP 분개전표 화면처럼 표 위 머리 칸에 둔다.
   const [y, m] = ms.split('-').map(Number);
   const acctDate = `${ms}-${pad(new Date(y, m, 0).getDate())}`;
-  const aoa=[['행번호','계정과목','비용구분','차변금액','대변금액','적요','귀속부서','활동센터','회계일']];
+  const aoa=[['회계일', acctDate], [], ['행번호','계정과목','비용구분','차변금액','대변금액','적요','귀속부서','활동센터']];
   sorted.forEach((e, i)=>{
     const dArr = e.date.split('-');
     const memoStr = `${dArr[0].slice(2)}.${dArr[1]}.${dArr[2]} ${e.memo||''}`.trim();
-    aoa.push([String(i+1).padStart(4, '0'), e.account, '판매', e.debit, e.credit, memoStr, e.department||'', e.department||'', acctDate]);
+    aoa.push([String(i+1).padStart(4, '0'), e.account, '판매', e.debit, e.credit, memoStr, e.department||'', e.department||'']);
   });
   const td=sorted.reduce((s,e)=>s+Number(e.debit||0),0);
   // 미지급금(대변)도 ERP 업로드 양식에 맞춰 전표 행에 이어지는 행번호를 부여한다.
-  aoa.push([String(sorted.length+1).padStart(4, '0'),'미지급금-(직원경비)','','',td,payableMemo(m,sorted),'','',acctDate]);
+  aoa.push([String(sorted.length+1).padStart(4, '0'),'미지급금-(직원경비)','','',td,payableMemo(m,sorted),'','']);
   const ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:10},{wch:26},{wch:10},{wch:12},{wch:12},{wch:34},{wch:16},{wch:16},{wch:12}];
+  ws['!cols']=[{wch:10},{wch:26},{wch:10},{wch:12},{wch:12},{wch:34},{wch:16},{wch:16}];
   XLSX.utils.book_append_sheet(wb, ws, ms);
 }
 
