@@ -72,6 +72,24 @@ const ACCOUNTS=['(판)여비교통비-(시내교통비)','(판)여비교통비-(
 // 사용처가 비어있을 때 다운로드 파일명에 쓸 계정과목 → 라벨 매핑
 const ACCOUNT_LABEL={'(판)여비교통비-(시내교통비)':'교통비','(판)여비교통비-(국내출장비)':'숙박비','(판)복리후생비':'식대','(판)소모품비':'소모품','(판)지급수수료':'수수료','(판)광고선전비':'광고선전비','(판)접대비':'접대비','미지급금-(직원경비)':'직원경비'};
 
+// 출장비 전표: 거래처는 회사(코나아이)로 고정하고 증빙란은 비워둔다.
+const TRIP_ACCOUNT='(판)여비교통비-(국내출장비)';
+const COMPANY_VENDOR='코나아이';
+const PROOF_PERSONAL_CARD='지출증빙_개인카드';
+const isTripExpense=e=>e.account===TRIP_ACCOUNT||String(e.memo||'').includes('출장비');
+
+// 미지급금 적요: 해당 월의 경비 종류를 나열한다. 예) "9월 출장, 교통비 경비"
+function payableMemo(month,rows){
+  const labels=[];
+  rows.forEach(e=>{
+    const l=isTripExpense(e)?'출장':(ACCOUNT_LABEL[e.account]||e.account);
+    if(!labels.includes(l))labels.push(l);
+  });
+  const i=labels.indexOf('출장');
+  if(i>0)labels.unshift(...labels.splice(i,1));
+  return `${month}월 ${labels.join(', ')} 경비`;
+}
+
 // 초기 시드 데이터
 const SEED=[];
 
@@ -331,7 +349,7 @@ function renderList(){
       <td class="lbl">미지급금-(직원경비)</td>
       <td class="r muted"></td>
       <td class="r" style="color:var(--credit)">${won(td)}</td>
-      <td></td>
+      <td style="white-space:normal" class="muted">${escapeHtml(payableMemo(m,rows))}</td>
       <td class="sticky-col"></td>
     </tr>`;
 
@@ -345,10 +363,11 @@ function renderList(){
         const id = row.dataset.id;
         const e = entries.find(x => String(x.id) === String(id));
         if (e) {
-          document.getElementById('previewVendor').value = e.vendor || '';
+          const trip = isTripExpense(e);
+          document.getElementById('previewVendor').value = trip ? COMPANY_VENDOR : (e.vendor || '');
           document.getElementById('previewName').value = e.employeeName || (isLoggedIn() ? (localStorage.getItem('expense_user_name') || '사원명 입력') : '사원명 입력');
           const pf = document.getElementById('previewProof');
-          if(pf) pf.value = '지출증빙_개인카드';
+          if(pf) pf.value = trip ? '' : PROOF_PERSONAL_CARD;
         }
         showReceiptInViewer(id);
       };
@@ -1663,17 +1682,20 @@ document.getElementById('btnToggleCal').onclick = () => {
 /* ---- export: 엑셀 + 영수증 이미지를 ZIP 하나로 즉시 다운로드 ---- */
 function buildMonthSheet(wb, ms, rows){
   const sorted = rows.slice().sort((a,b)=>a.date.localeCompare(b.date)||a.id-b.id);
-  const aoa=[['행번호','계정과목','비용구분','차변금액','대변금액','적요','귀속부서','활동센터']];
+  // 회계일은 지출한 달의 말일이다. 기존 열 순서(ERP 업로드 양식)를 건드리지 않도록 맨 뒤에 둔다.
+  const [y, m] = ms.split('-').map(Number);
+  const acctDate = `${ms}-${pad(new Date(y, m, 0).getDate())}`;
+  const aoa=[['행번호','계정과목','비용구분','차변금액','대변금액','적요','귀속부서','활동센터','회계일']];
   sorted.forEach((e, i)=>{
     const dArr = e.date.split('-');
     const memoStr = `${dArr[0].slice(2)}.${dArr[1]}.${dArr[2]} ${e.memo||''}`.trim();
-    aoa.push([String(i+1).padStart(4, '0'), e.account, '', e.debit, e.credit, memoStr, e.department||'', e.department||'']);
+    aoa.push([String(i+1).padStart(4, '0'), e.account, '판매', e.debit, e.credit, memoStr, e.department||'', e.department||'', acctDate]);
   });
   const td=sorted.reduce((s,e)=>s+Number(e.debit||0),0);
   // 미지급금(대변)도 ERP 업로드 양식에 맞춰 전표 행에 이어지는 행번호를 부여한다.
-  aoa.push([String(sorted.length+1).padStart(4, '0'),'미지급금-(직원경비)','','',td,'','','']);
+  aoa.push([String(sorted.length+1).padStart(4, '0'),'미지급금-(직원경비)','','',td,payableMemo(m,sorted),'','',acctDate]);
   const ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:10},{wch:26},{wch:10},{wch:12},{wch:12},{wch:34},{wch:16}];
+  ws['!cols']=[{wch:10},{wch:26},{wch:10},{wch:12},{wch:12},{wch:34},{wch:16},{wch:16},{wch:12}];
   XLSX.utils.book_append_sheet(wb, ws, ms);
 }
 
